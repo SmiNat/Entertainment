@@ -34,6 +34,7 @@ cursor = conn.cursor()
 
 
 # Database content
+
 # Games table
 csv_file = "data/games_data.csv"
 # with open(csv_file, 'rb') as rawdata:
@@ -41,25 +42,23 @@ csv_file = "data/games_data.csv"
 # print(result)
 df = pd.read_csv(csv_file, encoding="Windows-1252", low_memory=False)
 df.columns = df.columns.str.strip()
-df.to_sql("games_1", conn, if_exists="replace")
-
-csv_file = "data/steam_game_review/games.csv"
-df = pd.read_csv(csv_file)
-df.columns = df.columns.str.strip()
-df.to_sql("games_review", conn, if_exists="replace")
+df.to_sql("games", conn, if_exists="replace")
 
 db_games = {
-    "rename column": "ALTER TABLE games_review RENAME COLUMN price TO price_update;",
-    "create table": """CREATE TABLE games AS
-        SELECT g.*, gr.positive_ratings, gr.negative_ratings, gr.price_update
-        FROM games_1 AS g
-        LEFT JOIN games_review AS gr ON g.title = gr.title;""",
-    "name column in a table games": "ALTER TABLE games RENAME COLUMN multiplayer_or_singleplayer TO game_type;",
-    "drop column": "ALTER TABLE games DROP COLUMN id;",
-    "drop tables": [
-        "DROP TABLE games_1;",
-        "DROP TABLE games_review;",
+    "rename columns": [
+        "ALTER TABLE games RENAME COLUMN multiplayer_or_singleplayer TO game_type;",
+        "ALTER TABLE games RENAME COLUMN dc_price TO price_discounted;",
     ],
+    "drop column": [
+        "ALTER TABLE games DROP COLUMN id;",
+        "ALTER TABLE games DROP COLUMN win_support;",
+        "ALTER TABLE games DROP COLUMN mac_support;",
+        "ALTER TABLE games DROP COLUMN lin_support;",
+    ],
+    "delete rows": [
+        "DELETE FROM games WHERE overall_review IS NULL AND detailed_review IS NULL;",
+        """DELETE FROM games WHERE overall_review LIKE "1%" OR overall_review == "Free to play";"""
+    ]
 }
 execute_commands(db_games, conn)
 
@@ -122,9 +121,6 @@ execute_commands(db_movies, conn)
 
 # Books table
 csv_file = "data/goodreads_data.csv"
-# with open(csv_file, 'rb') as rawdata:
-#     result = chardet.detect(rawdata.read(100000))
-# print(result)
 df = pd.read_csv(csv_file)
 df.columns = df.columns.str.strip()
 df.to_sql("books", conn, if_exists="replace")

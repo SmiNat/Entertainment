@@ -66,17 +66,11 @@ class Games(Base):
     genres = Column(String)
     game_type = Column(String)
     price = Column(String)
-    dc_price = Column(String)
+    price_discounted = Column(String)
     overall_review = Column(String)
     detailed_review = Column(String)
     reviews = Column(String)
     percent_positive = Column(String)
-    win_support = Column(String)
-    mac_support = Column(Float)
-    lin_support = Column(Float)
-    positive_ratings = Column(Integer)
-    negative_ratings = Column(Integer)
-    price_update = Column(Float)
 
 
 class Movies(Base):
