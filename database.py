@@ -18,9 +18,9 @@ logging.basicConfig(
 
 db = "entertainment.db"
 if os.path.exists(db):
-    logging.info("➡️ Database already exists.")
+    logging.info("➡️  Database already exists.")
 else:
-    logging.info("➡️ Creating a database... (can take a while)")
+    logging.info("➡️  Creating a database... (can take a while)")
     import csv_converter
 
     if os.path.exists(db):
