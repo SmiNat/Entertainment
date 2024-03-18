@@ -1,22 +1,22 @@
 import logging
-import uuid
 import os
-from dotenv import load_dotenv
-from datetime import timedelta, datetime, timezone
+import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
-from fastapi import Depends, APIRouter, HTTPException
+from dotenv import load_dotenv
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel, Field, EmailStr
-from sqlalchemy.orm import Session
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 from starlette import status
-from jose import jwt
 
+from database import SessionLocal
 from enums import RoleEnum
 from exceptions import DatabaseError
-from database import SessionLocal
 from models import Users
 
 load_dotenv()
@@ -24,7 +24,7 @@ load_dotenv()
 # to silence AttributeError: module 'bcrypt' has no attribute '__about__'
 # which is not an error, just a warning that passlib attempts to read a version
 # and fails because it's loading modules that no longer exist in bcrypt 4.1.x.
-logging.getLogger('passlib').setLevel(logging.ERROR)
+logging.getLogger("passlib").setLevel(logging.ERROR)
 
 router = APIRouter(prefix="/auth", tags=["authorization"])
 
@@ -33,6 +33,7 @@ ALGORITHM = os.environ.get("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 
 class CreateUser(BaseModel):
@@ -43,7 +44,6 @@ class CreateUser(BaseModel):
     last_name: str = Field(min_length=2)
     password: str = Field(min_length=8)
     role: RoleEnum = Field(default=RoleEnum.user)
-    is_active: bool = True
 
 
 class Token(BaseModel):
@@ -76,11 +76,32 @@ def authenticate_user(username: str, password: str, db: Session):
     return user
 
 
-def create_access_token(username: str, user_id: uuid, expires_delta: timedelta | None = None):
-    data_to_encode = {"sub": username, "id": user_id}
-    expire = datetime.now(timezone.utc) + expires_delta if expires_delta else timedelta(minutes=15)
-    data_to_encode.update({"exp": expire})
-    return jwt.encode(data_to_encode, SECRET_KEY, algorithm=ALGORITHM)
+def create_access_token(
+    username: str, user_id: uuid, expires_delta: timedelta | None = None
+):
+    payload_to_encode = {"sub": username, "id": user_id}
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+    payload_to_encode.update({"exp": expire})
+    return jwt.encode(payload_to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
+        username: str = payload.get("sub")
+        user_id: uuid = payload.get("id")
+        if not username or not user_id:
+            return HTTPException(
+                status.HTTP_401_UNAUTHORIZED, "Could not validate credentials."
+            )
+        return {"username": username, "id": user_id}
+    except JWTError:
+        return HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "Could not validate credentials."
+        )
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -92,7 +113,7 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> None:
         first_name=new_user.first_name,
         last_name=new_user.last_name,
         hashed_password=bcrypt_context.hash(new_user.password),
-        role=new_user.role
+        role=new_user.role,
     )
 
     try:
@@ -104,13 +125,14 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> None:
         )
 
 
-@router.post("/token", description="Login", response_model=Token)
+@router.post("/token", response_model=Token)
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: db_dependency,
-
 ):
     user = authenticate_user(form_data.username, form_data.password, db)
-    token = create_access_token(user.username, str(user.user_id), timedelta(minutes=30))
+    token = create_access_token(
+        user.username, str(user.user_id), timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
 
     return {"access_token": token, "token_type": "bearer"}

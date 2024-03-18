@@ -57,14 +57,13 @@ db_games = {
     ],
     "delete rows": [
         "DELETE FROM games WHERE overall_review IS NULL AND detailed_review IS NULL;",
-        """DELETE FROM games WHERE overall_review LIKE "1%" OR overall_review == "Free to play";"""
+        """DELETE FROM games WHERE overall_review LIKE "1%" OR overall_review == "Free to play";""",
     ],
     "add column": [
         "ALTER TABLE games ADD COLUMN created_by VARCHAR;",
         "ALTER TABLE games ADD COLUMN updated_by VARCHAR;",
-        ],
-    "alter column created_by":
-        """UPDATE games
+    ],
+    "alter column created_by": """UPDATE games
         SET created_by = "www.kaggle.com - rahuldabholkar"
         WHERE created_by is NULL;""",
 }
@@ -103,9 +102,8 @@ db_songs = {
     "add column": [
         "ALTER TABLE songs ADD COLUMN created_by VARCHAR;",
         "ALTER TABLE songs ADD COLUMN updated_by VARCHAR;",
-        ],
-    "alter column created_by":
-        """UPDATE songs
+    ],
+    "alter column created_by": """UPDATE songs
         SET created_by = "www.kaggle.com - josephinelsy"
         WHERE created_by is NULL;""",
 }
@@ -131,7 +129,7 @@ db_movies = {
         SET crew = '---'
         WHERE crew is NULL and genre LIKE '%Animation%';
         """,
-    "alter column score":"""
+    "alter column score": """
         UPDATE movies
         SET score = round(score/10, 2)
         WHERE score > 0;
@@ -144,9 +142,8 @@ db_movies = {
     "add column": [
         "ALTER TABLE movies ADD COLUMN created_by VARCHAR;",
         "ALTER TABLE movies ADD COLUMN updated_by VARCHAR;",
-        ],
-    "alter column created_by":
-        """UPDATE movies
+    ],
+    "alter column created_by": """UPDATE movies
         SET created_by = "www.kaggle.com - ashpalsingh1525"
         WHERE created_by is NULL;""",
 }
@@ -185,9 +182,8 @@ db_books = {
     "add column": [
         "ALTER TABLE books ADD COLUMN created_by VARCHAR;",
         "ALTER TABLE books ADD COLUMN updated_by VARCHAR;",
-        ],
-    "alter column created_by":
-        """UPDATE books
+    ],
+    "alter column created_by": """UPDATE books
         SET created_by = "www.kaggle.com - ishikajohari"
         WHERE created_by is NULL;""",
 }
