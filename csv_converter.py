@@ -59,11 +59,14 @@ db_games = {
         "DELETE FROM games WHERE overall_review IS NULL AND detailed_review IS NULL;",
         """DELETE FROM games WHERE overall_review LIKE "1%" OR overall_review == "Free to play";"""
     ],
-    "add column": "ALTER TABLE games ADD COLUMN updated_by VARCHAR;",
-    "alter column updated_by":
+    "add column": [
+        "ALTER TABLE games ADD COLUMN created_by VARCHAR;",
+        "ALTER TABLE games ADD COLUMN updated_by VARCHAR;",
+        ],
+    "alter column created_by":
         """UPDATE games
-        SET updated_by = "www.kaggle.com - rahuldabholkar"
-        WHERE updated_by is NULL;""",
+        SET created_by = "www.kaggle.com - rahuldabholkar"
+        WHERE created_by is NULL;""",
 }
 execute_commands(db_games, conn)
 
@@ -97,11 +100,14 @@ db_songs = {
         "ALTER TABLE songs DROP COLUMN tempo;",
         "ALTER TABLE songs DROP COLUMN time_signature;",
     ],
-    "add column": "ALTER TABLE songs ADD COLUMN updated_by VARCHAR;",
-    "alter column updated_by":
+    "add column": [
+        "ALTER TABLE songs ADD COLUMN created_by VARCHAR;",
+        "ALTER TABLE songs ADD COLUMN updated_by VARCHAR;",
+        ],
+    "alter column created_by":
         """UPDATE songs
-        SET updated_by = "www.kaggle.com - josephinelsy"
-        WHERE updated_by is NULL;""",
+        SET created_by = "www.kaggle.com - josephinelsy"
+        WHERE created_by is NULL;""",
 }
 execute_commands(db_songs, conn)
 
@@ -113,24 +119,36 @@ df.to_sql("movies", conn, if_exists="replace")
 
 db_movies = {
     "drop columns": "ALTER TABLE movies DROP COLUMN status;",
-    "alter column date": """UPDATE movies
+    "alter column date": """
+        UPDATE movies
         SET date_x =
         substr(date_x, 7,4)||'-'||
         substr(date_x, 1,2)||'-'||
-        substr(date_x, 4,2);""",
-    "alter column crew": """UPDATE movies
+        substr(date_x, 4,2);
+        """,
+    "alter column crew": """
+        UPDATE movies
         SET crew = '---'
-        WHERE crew is NULL and genre LIKE '%Animation%';""",
+        WHERE crew is NULL and genre LIKE '%Animation%';
+        """,
+    "alter column score":"""
+        UPDATE movies
+        SET score = round(score/10, 2)
+        WHERE score > 0;
+        """,
     "rename columns": [
         "ALTER TABLE movies RENAME COLUMN names TO title;",
         "ALTER TABLE movies RENAME COLUMN date_x TO premiere;",
         "ALTER TABLE movies RENAME COLUMN budget_x TO budget;",
     ],
-    "add column": "ALTER TABLE movies ADD COLUMN updated_by VARCHAR;",
-    "alter column updated_by":
+    "add column": [
+        "ALTER TABLE movies ADD COLUMN created_by VARCHAR;",
+        "ALTER TABLE movies ADD COLUMN updated_by VARCHAR;",
+        ],
+    "alter column created_by":
         """UPDATE movies
-        SET updated_by = "www.kaggle.com - ashpalsingh1525"
-        WHERE updated_by is NULL;""",
+        SET created_by = "www.kaggle.com - ashpalsingh1525"
+        WHERE created_by is NULL;""",
 }
 execute_commands(db_movies, conn)
 
@@ -164,11 +182,14 @@ db_books = {
         "ALTER TABLE books RENAME COLUMN Avg_Rating TO avg_rating;",
         "ALTER TABLE books RENAME COLUMN Num_Ratings TO num_ratings;",
     ],
-    "add column": "ALTER TABLE books ADD COLUMN updated_by VARCHAR;",
-    "alter column updated_by":
+    "add column": [
+        "ALTER TABLE books ADD COLUMN created_by VARCHAR;",
+        "ALTER TABLE books ADD COLUMN updated_by VARCHAR;",
+        ],
+    "alter column created_by":
         """UPDATE books
-        SET updated_by = "www.kaggle.com - ishikajohari"
-        WHERE updated_by is NULL;""",
+        SET created_by = "www.kaggle.com - ishikajohari"
+        WHERE created_by is NULL;""",
 }
 execute_commands(db_books, conn)
 
