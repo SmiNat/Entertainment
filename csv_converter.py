@@ -58,7 +58,12 @@ db_games = {
     "delete rows": [
         "DELETE FROM games WHERE overall_review IS NULL AND detailed_review IS NULL;",
         """DELETE FROM games WHERE overall_review LIKE "1%" OR overall_review == "Free to play";"""
-    ]
+    ],
+    "add column": "ALTER TABLE games ADD COLUMN updated_by VARCHAR;",
+    "alter column updated_by":
+        """UPDATE games
+        SET updated_by = "www.kaggle.com - rahuldabholkar"
+        WHERE updated_by is NULL;""",
 }
 execute_commands(db_games, conn)
 
@@ -69,7 +74,7 @@ df.columns = df.columns.str.strip()
 df.to_sql("songs", conn, if_exists="replace")
 
 db_songs = {
-    "alter_column_genre": [
+    "alter column genre": [
         """UPDATE songs
         SET artist_genres = replace(artist_genres, '[', '')
         WHERE artist_genres LIKE '[%';""",
@@ -77,7 +82,7 @@ db_songs = {
         SET artist_genres = replace(artist_genres, ']', '')
         WHERE artist_genres LIKE '%]';""",
     ],
-    "drop_columns": [
+    "drop columns": [
         "ALTER TABLE songs DROP COLUMN playlist_url;",
         "ALTER TABLE songs DROP COLUMN danceability;",
         "ALTER TABLE songs DROP COLUMN energy;",
@@ -92,6 +97,11 @@ db_songs = {
         "ALTER TABLE songs DROP COLUMN tempo;",
         "ALTER TABLE songs DROP COLUMN time_signature;",
     ],
+    "add column": "ALTER TABLE songs ADD COLUMN updated_by VARCHAR;",
+    "alter column updated_by":
+        """UPDATE songs
+        SET updated_by = "www.kaggle.com - josephinelsy"
+        WHERE updated_by is NULL;""",
 }
 execute_commands(db_songs, conn)
 
@@ -102,20 +112,25 @@ df.columns = df.columns.str.strip()
 df.to_sql("movies", conn, if_exists="replace")
 
 db_movies = {
-    "drop_columns": "ALTER TABLE movies DROP COLUMN status;",
-    "alter_column_date": """UPDATE movies
+    "drop columns": "ALTER TABLE movies DROP COLUMN status;",
+    "alter column date": """UPDATE movies
         SET date_x =
         substr(date_x, 7,4)||'-'||
         substr(date_x, 1,2)||'-'||
         substr(date_x, 4,2);""",
-    "alter_column_crew": """UPDATE movies
+    "alter column crew": """UPDATE movies
         SET crew = '---'
         WHERE crew is NULL and genre LIKE '%Animation%';""",
-    "rename_columns": [
+    "rename columns": [
         "ALTER TABLE movies RENAME COLUMN names TO title;",
         "ALTER TABLE movies RENAME COLUMN date_x TO premiere;",
         "ALTER TABLE movies RENAME COLUMN budget_x TO budget;",
     ],
+    "add column": "ALTER TABLE movies ADD COLUMN updated_by VARCHAR;",
+    "alter column updated_by":
+        """UPDATE movies
+        SET updated_by = "www.kaggle.com - ashpalsingh1525"
+        WHERE updated_by is NULL;""",
 }
 execute_commands(db_movies, conn)
 
@@ -126,11 +141,11 @@ df.columns = df.columns.str.strip()
 df.to_sql("books", conn, if_exists="replace")
 
 db_books = {
-    "drop_columns": [
+    "drop columns": [
         "ALTER TABLE books DROP COLUMN URL;",
         "ALTER TABLE books DROP COLUMN 'Unnamed: 0';",
     ],
-    "alter_column_genres": [
+    "alter column genres": [
         """UPDATE books
         SET Genres = replace(Genres, '[', '')
         WHERE Genres LIKE '[%';""",
@@ -138,10 +153,10 @@ db_books = {
         SET Genres = replace(Genres, ']', '')
         WHERE Genres LIKE '%]';""",
     ],
-    "alter_column_rating": """UPDATE books
+    "alter column rating": """UPDATE books
         SET Num_Ratings = replace(Num_Ratings, ',', '')
         WHERE Num_Ratings LIKE '%,%';""",
-    "rename_column": [
+    "rename column": [
         "ALTER TABLE books RENAME COLUMN Book TO book;",
         "ALTER TABLE books RENAME COLUMN Author TO author;",
         "ALTER TABLE books RENAME COLUMN Description TO description;",
@@ -149,6 +164,11 @@ db_books = {
         "ALTER TABLE books RENAME COLUMN Avg_Rating TO avg_rating;",
         "ALTER TABLE books RENAME COLUMN Num_Ratings TO num_ratings;",
     ],
+    "add column": "ALTER TABLE books ADD COLUMN updated_by VARCHAR;",
+    "alter column updated_by":
+        """UPDATE books
+        SET updated_by = "www.kaggle.com - ishikajohari"
+        WHERE updated_by is NULL;""",
 }
 execute_commands(db_books, conn)
 
