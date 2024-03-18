@@ -17,6 +17,7 @@ class Users(Base):
     last_name = Column(String, nullable=True)
     hashed_password = Column(String)
     role = Column(String)
+    is_active = Column(Boolean, default=True)
     create_timestamp = Column(DateTime, default=datetime.datetime.now())
     update_timestamp = Column(
         DateTime, default=datetime.datetime.now(), onupdate=datetime.datetime.now()
