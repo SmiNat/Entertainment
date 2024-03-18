@@ -29,7 +29,7 @@ router = APIRouter(
 )
 
 
-def get_db():
+async def get_db():
     db = SessionLocal()
     try:
         yield db
@@ -53,9 +53,8 @@ def check_date(date_value: str, format: str = "%Y-%m-%d") -> None:
 
 class MoviesRequest(BaseModel):
 
-    # index: xyz
     title: str
-    premiere: str = Field(description="YYYY-MM-DD format.")
+    premiere: datetime.date = Field(description="YYYY-MM-DD format.")
     score: float = Field(default=0, ge=0, le=1000)
     genre: list = Field(max_length=500)
     overview: str = Field(max_length=500)
@@ -67,7 +66,14 @@ class MoviesRequest(BaseModel):
     country: str = Field(default=None, max_length=3)
 
 
-class UsedDataRequest(BaseModel):
+class MoviesResponse(MoviesRequest):
+
+    index: int
+    created_by: str
+    updated_by: str
+
+
+class UserDataRequest(BaseModel):
 
     # data_id = Column(Integer, primary_key=True, index=True, unique=True)
     finished: bool = False
@@ -145,7 +151,7 @@ async def search_movies(
             default="1900-1-1", description="Use yyyy-mm-dd."),
         premiere_before: str = Query(
             default="2050-1-1", description="Use yyyy-mm-dd."),
-        score_ge: float = Query(default=0, ge=0, le=100),
+        score_ge: float = Query(default=0, ge=0, le=10),
         genre_primary: str | None = None,
         genre_secondary: str | None = None,
         crew: str | None = None,
@@ -192,3 +198,4 @@ async def search_movies(
         # casefold
         # in list
         # (comma saparated if more than 1)
+
