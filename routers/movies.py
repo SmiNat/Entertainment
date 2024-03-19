@@ -40,7 +40,7 @@ async def get_db():
 
 db_dependency = Annotated[Session, Depends(get_db)]
 # userdata_dependency = Annotated[Session, Depends(get_db)]
-user_dependency = Annotated[dict, Depends(get_current_user)]  # okodować
+user_dependency = Annotated[dict, Depends(get_current_user)]
 
 
 def check_date(date_value: str, format: str = "%Y-%m-%d") -> None:
@@ -106,25 +106,7 @@ class UserDataRequest(BaseModel):
     # movie_id = Column(Integer, ForeignKey("movies.index"))
 
 
-test_db = [
-    {"title": "Creed III", "year": 2020, "stars": "Sylvester Stalone"},
-    {"title": "Titanic", "year": 1980, "stars": "Leonardo DiCaprio, Kate Winslet"},
-]
-
-
-@router.get("/test_all")
-async def get_all():
-    return test_db
-
-
-@router.get("/test_search")
-async def get_test(title: str):
-    for element in test_db:
-        if title.lower() in element["title"].lower():
-            return element
-
-
-@router.get("/genres", description="Get all available movie genres.")
+@router.get("/genres", status_code=200, description="Get all available movie genres.")
 def get_movies_genre(db: db_dependency) -> set:
     query = select(Movies.genre).distinct()
     genres = db.execute(query).scalars().all()
@@ -153,6 +135,7 @@ async def get_all_movies(
     page_size: int = Query(10, ge=1, le=100),
     page: int = Query(default=1, gt=0),
 ) -> dict[str, list[Row[_TP]]]:
+
     movie_model = db.query(Movies).all()
 
     if movie_model is None:
@@ -217,7 +200,9 @@ async def search_movies(
 
 @router.post("/add", status_code=status.HTTP_201_CREATED)
 async def add_movie(
-    db: db_dependency, user: user_dependency, movie_request: MoviesRequest
+    db: db_dependency,
+    user: user_dependency,
+    movie_request: MoviesRequest
 ):
     if not user:
         raise HTTPException(

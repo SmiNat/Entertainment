@@ -2,21 +2,19 @@ import logging
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Annotated
+from typing import Annotated, Union
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.param_functions import Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy.exc import IntegrityError
+from pydantic import BaseModel, SecretStr
 from sqlalchemy.orm import Session
 from starlette import status
 
 from database import SessionLocal
-from enums import RoleEnum
-from exceptions import DatabaseError
 from models import Users
 
 load_dotenv()
@@ -34,16 +32,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/token")
-
-
-class CreateUser(BaseModel):
-
-    username: str = Field(min_length=5)
-    email: EmailStr
-    first_name: str = Field(min_length=2)
-    last_name: str = Field(min_length=2)
-    password: str = Field(min_length=8)
-    role: RoleEnum = Field(default=RoleEnum.user)
 
 
 class Token(BaseModel):
@@ -101,27 +89,6 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
     except JWTError:
         return HTTPException(
             status.HTTP_401_UNAUTHORIZED, "Could not validate credentials."
-        )
-
-
-@router.post("/", status_code=status.HTTP_201_CREATED)
-async def create_user(db: db_dependency, new_user: CreateUser) -> None:
-    user_model = Users(
-        user_id=uuid.uuid4(),
-        username=new_user.username,
-        email=new_user.email,
-        first_name=new_user.first_name,
-        last_name=new_user.last_name,
-        hashed_password=bcrypt_context.hash(new_user.password),
-        role=new_user.role,
-    )
-
-    try:
-        db.add(user_model)
-        db.commit()
-    except IntegrityError as e:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, detail=f"{DatabaseError(e._message())}"
         )
 
 
