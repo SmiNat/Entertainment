@@ -1,8 +1,8 @@
 import datetime
 import uuid
-from typing import Annotated, Optional
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.exc import IntegrityError
@@ -14,7 +14,6 @@ from exceptions import DatabaseError
 from models import Users
 
 from .auth import get_current_user
-
 
 router = APIRouter(prefix="/user", tags=["user"])
 
@@ -36,8 +35,8 @@ user_dependency = Annotated[dict, Depends(get_current_user)]
 class User(BaseModel):
     username: str = Field(min_length=5)
     email: EmailStr
-    first_name: str | None = Field(min_length=2)
-    last_name: str | None = Field(min_length=2)
+    first_name: str | None = Field(min_length=2, examples=[None])
+    last_name: str | None = Field(min_length=2, examples=[None])
 
 
 class CreateUser(User):
@@ -59,8 +58,8 @@ class GetUser(User):
 class UpdateUser(User):
     username: str | None = Field(min_length=5, examples=[None])
     email: EmailStr | None = Field(examples=[None])
-    first_name: str | None = Field(min_length=2, examples=[None])
-    last_name: str | None = Field(min_length=2, examples=[None])
+    # first_name: str | None = Field(min_length=2, examples=[None])
+    # last_name: str | None = Field(min_length=2, examples=[None])
 
 
 class ChangePassword(BaseModel):
@@ -72,7 +71,9 @@ class ChangePassword(BaseModel):
 @router.get("/{username}", status_code=status.HTTP_200_OK, response_model=GetUser)
 async def get_user(username: str, db: db_dependency, user: user_dependency):
 
-    authenticated_user = db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).first()
+    authenticated_user = (
+        db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).first()
+    )
     requested_user = db.query(Users).filter(Users.username == username).first()
 
     if not authenticated_user or not requested_user:
@@ -83,7 +84,7 @@ async def get_user(username: str, db: db_dependency, user: user_dependency):
             raise HTTPException(
                 status.HTTP_401_UNAUTHORIZED,
                 "Access to see other users' data is restricted. The user can only see "
-                "personal information."
+                "personal information.",
             )
     return requested_user
 
@@ -101,7 +102,7 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> None:
         first_name=new_user.first_name,
         last_name=new_user.last_name,
         hashed_password=bcrypt_context.hash(new_user.password.strip()),
-        role=RoleEnum.user, # for security reasons, all users created via API has 'user' role
+        role=RoleEnum.user,  # for security reasons, all users created via API has 'user' role
     )
 
     try:
@@ -113,28 +114,12 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> None:
         )
 
 
-@router.put("/password", status_code=status.HTTP_202_ACCEPTED)
-async def change_password(db: db_dependency, user: user_dependency, password: ChangePassword):
-
-    authenticated_user = db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).first()
-
-    if not bcrypt_context.verify(password.current_password.strip(), authenticated_user.hashed_password):
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED, "Failed Authentication - incorrect current password."
-        )
-
-    if not password.new_password.strip() == password.confirm_password.strip():
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Passwords does not match.")
-
-    authenticated_user.hashed_password = bcrypt_context.hash(password.new_password.strip())
-    db.add(authenticated_user)
-    db.commit()
-
-
-@router.patch("/update", status_code=status.HTTP_202_ACCEPTED)
+@router.patch("/", status_code=status.HTTP_202_ACCEPTED)
 async def update_user(db: db_dependency, user: user_dependency, data: UpdateUser):
 
-    authenticated_user = db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).first()
+    authenticated_user = (
+        db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).first()
+    )
 
     for field, value in data.model_dump(exclude_unset=True, exclude_none=True).items():
         setattr(authenticated_user, field, value)
@@ -142,19 +127,42 @@ async def update_user(db: db_dependency, user: user_dependency, data: UpdateUser
     db.commit()
 
 
-@router.delete("/{username}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(db: db_dependency, user: user_dependency, username: str):
+@router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(db: db_dependency, user: user_dependency):
 
-    authenticated_user = db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).first()
+    authenticated_user = (
+        db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).first()
+    )
 
     if not authenticated_user:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No user found in the database.")
 
-    if username != user["username"]:
+    db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).delete()
+    db.commit()
+
+
+@router.put("/password", status_code=status.HTTP_202_ACCEPTED)
+async def change_password(
+    db: db_dependency, user: user_dependency, password: ChangePassword
+):
+
+    authenticated_user = (
+        db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).first()
+    )
+
+    if not bcrypt_context.verify(
+        password.current_password.strip(), authenticated_user.hashed_password
+    ):
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,
-            "Not allowed. A user can only delete their own account."
+            "Failed Authentication - incorrect current password.",
         )
 
-    db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).delete()
+    if not password.new_password.strip() == password.confirm_password.strip():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Passwords does not match.")
+
+    authenticated_user.hashed_password = bcrypt_context.hash(
+        password.new_password.strip()
+    )
+    db.add(authenticated_user)
     db.commit()

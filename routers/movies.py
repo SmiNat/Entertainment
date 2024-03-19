@@ -57,10 +57,8 @@ async def check_genre(db: Session, genres: list[str]):
     accessible_genres = get_movies_genre(db)
     for genre in genres:
         if genre.lower() in accessible_genres:
-            print("OK")
             continue
         else:
-            print("NIE OK", genre)
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN,
                 "Invalid genre (check 'get movies genre' for list of accessible genres).",
@@ -80,10 +78,6 @@ class MoviesRequest(BaseModel):
     budget: float | None = Field(default=None, ge=0, examples=[None])
     revenue: float | None = Field(default=None, ge=0, examples=[None])
     country: str | None = Field(default=None, max_length=3, examples=[None])
-
-    # @validator("premiere")
-    # def to_string(cls, date: datetime.date):
-    #     return date.strftime("%Y-%m-%d")
 
 
 class MoviesResponse(MoviesRequest):
@@ -200,9 +194,7 @@ async def search_movies(
 
 @router.post("/add", status_code=status.HTTP_201_CREATED)
 async def add_movie(
-    db: db_dependency,
-    user: user_dependency,
-    movie_request: MoviesRequest
+    db: db_dependency, user: user_dependency, movie_request: MoviesRequest
 ):
     if not user:
         raise HTTPException(
