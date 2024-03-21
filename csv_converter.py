@@ -44,10 +44,13 @@ df = pd.read_csv(csv_file, encoding="Windows-1252", low_memory=False)
 df.columns = df.columns.str.strip()
 df.to_sql("games", conn, if_exists="replace")
 
+# Note: The PRICE is in INR - this will be converted to EUR @0.011 exchange rate
+
 db_games = {
     "rename columns": [
         "ALTER TABLE games RENAME COLUMN multiplayer_or_singleplayer TO game_type;",
         "ALTER TABLE games RENAME COLUMN dc_price TO price_discounted;",
+        "ALTER TABLE games RENAME COLUMN percent_positive TO positive_reviews_%;",
     ],
     "drop column": [
         "ALTER TABLE games DROP COLUMN id;",
@@ -58,6 +61,34 @@ db_games = {
     "delete rows": [
         "DELETE FROM games WHERE overall_review IS NULL AND detailed_review IS NULL;",
         """DELETE FROM games WHERE overall_review LIKE "1%" OR overall_review == "Free to play";""",
+    ],
+    "alter column price": [
+        """UPDATE games
+        SET price = replace(price, ',', '')
+        WHERE price LIKE "%,%";""",
+        """UPDATE games
+        SET price = round(price*0.011, 2)
+        WHERE price > 0;""",
+        "ALTER TABLE games ADD COLUMN price_eur REAL;",
+        "UPDATE games SET price_eur = price;",
+        "ALTER TABLE games DROP COLUMN price;",
+    ],
+    "alter column price_discounted": [
+        """UPDATE games
+        SET price_discounted = replace(price_discounted, ',', '')
+        WHERE price_discounted LIKE "%,%";""",
+        """UPDATE games
+        SET price_discounted = round(price_discounted*0.011, 2)
+        WHERE price_discounted > 0;""",
+        "ALTER TABLE games ADD COLUMN price_discounted_eur REAL;",
+        "UPDATE games SET price_discounted_eur = price_discounted;",
+        "ALTER TABLE games DROP COLUMN price_discounted;",
+    ],
+    "alter column reviews": [
+        "ALTER TABLE games ADD COLUMN reviews_int INTEGER;",
+        "UPDATE games SET reviews_int = reviews;",
+        "ALTER TABLE games DROP COLUMN reviews;",
+        "ALTER TABLE games RENAME COLUMN reviews_int TO reviews;",
     ],
     "add column": [
         "ALTER TABLE games ADD COLUMN created_by VARCHAR;",
