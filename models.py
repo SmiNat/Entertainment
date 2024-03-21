@@ -1,7 +1,15 @@
 import datetime
 
-from sqlalchemy import (UUID, Boolean, Column, DateTime, Float, ForeignKey,
-                        Integer, String)
+from sqlalchemy import (
+    UUID,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+)
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -16,6 +24,8 @@ class Users(Base):
     first_name = Column(String, nullable=True)
     last_name = Column(String, nullable=True)
     hashed_password = Column(String)
+    role = Column(String)
+    is_active = Column(Boolean, default=True)
     create_timestamp = Column(DateTime, default=datetime.datetime.now())
     update_timestamp = Column(
         DateTime, default=datetime.datetime.now(), onupdate=datetime.datetime.now()
@@ -39,27 +49,41 @@ class UserData(Base):
     )
     user_id = Column(UUID, ForeignKey("users.user_id"))
     movie_id = Column(Integer, ForeignKey("movies.index"))
+    book_id = Column(Integer, ForeignKey("books.index"))
+    song_id = Column(Integer, ForeignKey("songs.index"))
+    game_id = Column(Integer, ForeignKey("games.index"))
 
     user = relationship("Users", back_populates="data")
     movie = relationship("Movies", back_populates="user")
+    book = relationship("Books", back_populates="user")
+    song = relationship("Songs", back_populates="user")
+    game = relationship("Games", back_populates="user")
 
 
 class Books(Base):
     __tablename__ = "books"
 
-    index = Column(Integer, primary_key=True, index=True, unique=True)
+    index = Column(
+        Integer, primary_key=True, index=True, unique=True, autoincrement=True
+    )
     book = Column(String)
     author = Column(String)
     description = Column(String, nullable=True)
     genres = Column(String)
     avg_rating = Column(Float, nullable=True)
     num_ratings = Column(String, nullable=True)
+    created_by = Column(String, nullable=True)
     updated_by = Column(String, nullable=True)
+
+    user = relationship("UserData", back_populates="book")
 
 
 class Games(Base):
     __tablename__ = "games"
-    index = Column(Integer, primary_key=True, index=True, unique=True)
+
+    index = Column(
+        Integer, primary_key=True, index=True, unique=True, autoincrement=True
+    )
     title = Column(String)
     release_date = Column(String)
     developer = Column(String, nullable=True)
@@ -72,7 +96,10 @@ class Games(Base):
     detailed_review = Column(String, nullable=True)
     reviews = Column(String, nullable=True)
     percent_positive = Column(String, nullable=True)
+    created_by = Column(String, nullable=True)
     updated_by = Column(String, nullable=True)
+
+    user = relationship("UserData", back_populates="game")
 
 
 class Movies(Base):
@@ -92,6 +119,7 @@ class Movies(Base):
     budget = Column(Float, nullable=True)
     revenue = Column(Float, nullable=True)
     country = Column(String, nullable=True)
+    created_by = Column(String, nullable=True)
     updated_by = Column(String, nullable=True)
 
     user = relationship("UserData", back_populates="movie")
@@ -100,7 +128,9 @@ class Movies(Base):
 class Songs(Base):
     __tablename__ = "songs"
 
-    index = Column(Integer, primary_key=True, index=True, unique=True)
+    index = Column(
+        Integer, primary_key=True, index=True, unique=True, autoincrement=True
+    )
     year = Column(Integer)
     track_id = Column(String, nullable=True)
     track_name = Column(String)
@@ -111,4 +141,7 @@ class Songs(Base):
     artist_genres = Column(String)
     artist_popularity = Column(Integer, nullable=True)
     duration_ms = Column(Float, nullable=True)
+    created_by = Column(String, nullable=True)
     updated_by = Column(String, nullable=True)
+
+    user = relationship("UserData", back_populates="song")
