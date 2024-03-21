@@ -2,15 +2,14 @@ import logging
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Annotated, Union
+from typing import Annotated
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.param_functions import Form
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel, SecretStr
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from starlette import status
 
@@ -55,11 +54,13 @@ def authenticate_user(username: str, password: str, db: Session):
     user = db.query(Users).filter(Users.username == username).first()
     if not user:
         raise HTTPException(
-            status.HTTP_404_NOT_FOUND, f"User '{username}' not found in the database."
+            status.HTTP_404_NOT_FOUND,
+            f"User '{username}' not found in the database."
         )
     if not bcrypt_context.verify(password, user.hashed_password):
         raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED, "Failed Authentication - incorrect password."
+            status.HTTP_401_UNAUTHORIZED,
+            "Failed Authentication - incorrect password."
         )
     return user
 
@@ -92,14 +93,15 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
         )
 
 
-@router.post("/token", response_model=Token)
+@router.post("/token", response_model=Token, status_code=status.HTTP_200_OK)
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: db_dependency,
-):
+) -> dict[str, str]:
     user = authenticate_user(form_data.username, form_data.password, db)
     token = create_access_token(
-        user.username, str(user.user_id), timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        user.username, str(user.user_id),
+        timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
 
     return {"access_token": token, "token_type": "bearer"}

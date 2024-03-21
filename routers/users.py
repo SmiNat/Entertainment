@@ -58,8 +58,6 @@ class GetUser(User):
 class UpdateUser(User):
     username: str | None = Field(min_length=5, examples=[None])
     email: EmailStr | None = Field(examples=[None])
-    # first_name: str | None = Field(min_length=2, examples=[None])
-    # last_name: str | None = Field(min_length=2, examples=[None])
 
 
 class ChangePassword(BaseModel):
@@ -77,14 +75,16 @@ async def get_user(username: str, db: db_dependency, user: user_dependency):
     requested_user = db.query(Users).filter(Users.username == username).first()
 
     if not authenticated_user or not requested_user:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No user found in the database.")
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "No user found in the database."
+        )
 
     if authenticated_user.role != "admin":
         if username != user["username"]:
             raise HTTPException(
                 status.HTTP_401_UNAUTHORIZED,
-                "Access to see other users' data is restricted. The user can only see "
-                "personal information.",
+                "Access to see other users' data is restricted. "
+                "The user can only see personal information.",
             )
     return requested_user
 
@@ -93,7 +93,9 @@ async def get_user(username: str, db: db_dependency, user: user_dependency):
 async def create_user(db: db_dependency, new_user: CreateUser) -> None:
 
     if not new_user.password == new_user.confirm_password:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Passwords does not match.")
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "Passwords does not match."
+        )
 
     user_model = Users(
         user_id=uuid.uuid4(),
@@ -102,7 +104,8 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> None:
         first_name=new_user.first_name,
         last_name=new_user.last_name,
         hashed_password=bcrypt_context.hash(new_user.password.strip()),
-        role=RoleEnum.user,  # for security reasons, all users created via API has 'user' role
+        role=RoleEnum.user,  # for security reasons, all users created
+                             # via API has 'user' role
     )
 
     try:
@@ -114,7 +117,7 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> None:
         )
 
 
-@router.patch("/", status_code=status.HTTP_202_ACCEPTED)
+@router.patch("/", status_code=status.HTTP_204_NO_CONTENT)
 async def update_user(db: db_dependency, user: user_dependency, data: UpdateUser):
 
     authenticated_user = (
@@ -135,13 +138,15 @@ async def delete_user(db: db_dependency, user: user_dependency):
     )
 
     if not authenticated_user:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No user found in the database.")
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "No user found in the database."
+        )
 
     db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).delete()
     db.commit()
 
 
-@router.put("/password", status_code=status.HTTP_202_ACCEPTED)
+@router.put("/password", status_code=status.HTTP_204_NO_CONTENT)
 async def change_password(
     db: db_dependency, user: user_dependency, password: ChangePassword
 ):
@@ -159,7 +164,9 @@ async def change_password(
         )
 
     if not password.new_password.strip() == password.confirm_password.strip():
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Passwords does not match.")
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "Passwords does not match."
+        )
 
     authenticated_user.hashed_password = bcrypt_context.hash(
         password.new_password.strip()

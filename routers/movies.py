@@ -3,15 +3,15 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field, validator
-from sqlalchemy import Row, and_, or_, select
+from pydantic import BaseModel, Field
+from sqlalchemy import Row, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql._typing import _TP
 from sqlalchemy.sql.expression import func
 from starlette import status
 
 from database import SessionLocal
-from models import Movies, UserData
+from models import Movies
 
 from .auth import get_current_user
 
@@ -232,3 +232,9 @@ async def add_movie(
 
     db.add(movie_model)
     db.commit()
+
+
+@router.patch("/update/{title}/{premiere}", status_code=204)
+async def update_movie():
+    # update either empty fields or own movie
+    pass
