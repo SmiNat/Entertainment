@@ -3,6 +3,9 @@ import sqlite3
 import chardet
 import pandas as pd
 
+from logger import db_logger
+
+
 pd.set_option("display.width", 300)
 pd.set_option("display.max_columns", 15)
 
@@ -37,9 +40,9 @@ cursor = conn.cursor()
 
 # Games table
 csv_file = "data/games_data.csv"
-# with open(csv_file, 'rb') as rawdata:
-#     result = chardet.detect(rawdata.read(100000))
-# print(result)
+with open(csv_file, 'rb') as rawdata:
+    result = chardet.detect(rawdata.read(100000))
+db_logger.info("⚠️ File 'games_data.csv' encoding: %s." %result)
 df = pd.read_csv(csv_file, encoding="Windows-1252", low_memory=False)
 df.columns = df.columns.str.strip()
 df.to_sql("games", conn, if_exists="replace")

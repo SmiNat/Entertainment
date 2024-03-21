@@ -1,5 +1,4 @@
 import datetime
-import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,18 +11,10 @@ from starlette import status
 
 from database import SessionLocal
 from models import Movies
+from logger import app_logger
 
 from .auth import get_current_user
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(message)s",
-    datefmt="%d-%b-%y %H:%M:%S",
-    handlers=[
-        # logging.FileHandler("debug.log"),
-        logging.StreamHandler()
-    ],
-)
 
 router = APIRouter(
     prefix="/movies", tags=["movies"], responses={404: {"description": "Not found."}}
@@ -114,7 +105,7 @@ def get_movies_genre(db: db_dependency) -> set:
                 for genre in genre_list:
                     genre = str(genre).strip()
                     unique_genres.add(genre.lower())
-    logging.info("✅ Number of available movie genres: %s." % len(unique_genres))
+    app_logger.info("✅ Number of available movie genres: %s." % len(unique_genres))
     return unique_genres
 
 
@@ -135,7 +126,7 @@ async def get_all_movies(
     if movie_model is None:
         raise HTTPException(status_code=404, detail="Movie not found.")
 
-    logging.info("✅ Database hits: %s records." % len(movie_model))
+    app_logger.info("✅ Database hits: %s records." % len(movie_model))
 
     start_index = (page - 1) * page_size
     end_index = start_index + page_size
@@ -186,7 +177,7 @@ async def search_movies(
     if query is None:
         raise HTTPException(status_code=404, detail="Movie not found.")
 
-    logging.info("✅ Database hits: %s." % len(query.all()))
+    app_logger.info("✅ Database hits: %s." % len(query.all()))
 
     results = query.offset((page - 1) * 10).limit(10).all()
     return {"number of movies": len(query.all()), "movies": results}
