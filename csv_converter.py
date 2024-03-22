@@ -40,9 +40,9 @@ cursor = conn.cursor()
 
 # Games table
 csv_file = "data/games_data.csv"
-with open(csv_file, 'rb') as rawdata:
-    result = chardet.detect(rawdata.read(100000))
-db_logger.info("⚠️ File 'games_data.csv' encoding: %s." %result)
+with open(csv_file, 'rb') as raw_data:
+    result = chardet.detect(raw_data.read(100000))
+db_logger.info("#️⃣ File 'games_data.csv' encoding: %s." %result)
 df = pd.read_csv(csv_file, encoding="Windows-1252", low_memory=False)
 df.columns = df.columns.str.strip()
 df.to_sql("games", conn, if_exists="replace")
@@ -50,56 +50,89 @@ df.to_sql("games", conn, if_exists="replace")
 # Note: The PRICE is in INR - this will be converted to EUR @0.011 exchange rate
 
 db_games = {
-    "rename columns": [
-        "ALTER TABLE games RENAME COLUMN multiplayer_or_singleplayer TO game_type;",
-        "ALTER TABLE games RENAME COLUMN dc_price TO price_discounted;",
-        "ALTER TABLE games RENAME COLUMN percent_positive TO positive_reviews_%;",
-    ],
-    "drop column": [
+    "drop columns #1": [
         "ALTER TABLE games DROP COLUMN id;",
         "ALTER TABLE games DROP COLUMN win_support;",
         "ALTER TABLE games DROP COLUMN mac_support;",
         "ALTER TABLE games DROP COLUMN lin_support;",
     ],
     "delete rows": [
-        "DELETE FROM games WHERE overall_review IS NULL AND detailed_review IS NULL;",
-        """DELETE FROM games WHERE overall_review LIKE "1%" OR overall_review == "Free to play";""",
+        """
+        DELETE FROM games
+        WHERE overall_review IS NULL AND detailed_review IS NULL;
+        """,
+        """
+        DELETE FROM games
+        WHERE overall_review LIKE "1%" OR overall_review == "Free to play";
+        """,
     ],
-    "alter column price": [
-        """UPDATE games
+    "update columns": [
+        """
+        UPDATE games
+        SET developer = replace(developer, ';', ', ')
+        WHERE developer LIKE '%;%';
+        """,
+        """
+        UPDATE games
+        SET publisher = replace(publisher, ';', ', ')
+        WHERE publisher LIKE '%;%';
+        """,
+        """
+        UPDATE games
+        SET genres = replace(genres, ';', ', ')
+        WHERE genres LIKE '%;%';
+        """,
+        """
+        UPDATE games
+        SET multiplayer_or_singleplayer = replace(multiplayer_or_singleplayer, ';', ', ')
+        WHERE multiplayer_or_singleplayer LIKE '%;%';
+        """,
+        """
+        UPDATE games
         SET price = replace(price, ',', '')
-        WHERE price LIKE "%,%";""",
-        """UPDATE games
+        WHERE price LIKE "%,%";
+        """,
+        """
+        UPDATE games
         SET price = round(price*0.011, 2)
-        WHERE price > 0;""",
+        WHERE price > 0;
+        """,
+        """
+        UPDATE games
+        SET dc_price = replace(dc_price, ',', '')
+        WHERE dc_price LIKE "%,%";
+        """,
+        """
+        UPDATE games
+        SET dc_price = round(dc_price*0.011, 2)
+        WHERE dc_price > 0;
+        """,
+    ],
+    "add and fill columns": [
         "ALTER TABLE games ADD COLUMN price_eur REAL;",
         "UPDATE games SET price_eur = price;",
-        "ALTER TABLE games DROP COLUMN price;",
-    ],
-    "alter column price_discounted": [
-        """UPDATE games
-        SET price_discounted = replace(price_discounted, ',', '')
-        WHERE price_discounted LIKE "%,%";""",
-        """UPDATE games
-        SET price_discounted = round(price_discounted*0.011, 2)
-        WHERE price_discounted > 0;""",
         "ALTER TABLE games ADD COLUMN price_discounted_eur REAL;",
-        "UPDATE games SET price_discounted_eur = price_discounted;",
-        "ALTER TABLE games DROP COLUMN price_discounted;",
-    ],
-    "alter column reviews": [
+        "UPDATE games SET price_discounted_eur = dc_price;",
         "ALTER TABLE games ADD COLUMN reviews_int INTEGER;",
         "UPDATE games SET reviews_int = reviews;",
-        "ALTER TABLE games DROP COLUMN reviews;",
-        "ALTER TABLE games RENAME COLUMN reviews_int TO reviews;",
-    ],
-    "add column": [
         "ALTER TABLE games ADD COLUMN created_by VARCHAR;",
         "ALTER TABLE games ADD COLUMN updated_by VARCHAR;",
-    ],
-    "alter column created_by": """UPDATE games
+        """
+        UPDATE games
         SET created_by = "www.kaggle.com - rahuldabholkar"
-        WHERE created_by is NULL;""",
+        WHERE created_by is NULL;
+        """,
+    ],
+    "drop columns #2": [
+        "ALTER TABLE games DROP COLUMN price;",
+        "ALTER TABLE games DROP COLUMN dc_price;",
+        "ALTER TABLE games DROP COLUMN reviews;",
+    ],
+    "rename columns": [
+        "ALTER TABLE games RENAME COLUMN multiplayer_or_singleplayer TO type;",
+        "ALTER TABLE games RENAME COLUMN percent_positive TO positive_reviews;",
+        "ALTER TABLE games RENAME COLUMN reviews_int TO reviews;",
+    ],
 }
 execute_commands(db_games, conn)
 
@@ -110,14 +143,6 @@ df.columns = df.columns.str.strip()
 df.to_sql("songs", conn, if_exists="replace")
 
 db_songs = {
-    "alter column genre": [
-        """UPDATE songs
-        SET artist_genres = replace(artist_genres, '[', '')
-        WHERE artist_genres LIKE '[%';""",
-        """UPDATE songs
-        SET artist_genres = replace(artist_genres, ']', '')
-        WHERE artist_genres LIKE '%]';""",
-    ],
     "drop columns": [
         "ALTER TABLE songs DROP COLUMN playlist_url;",
         "ALTER TABLE songs DROP COLUMN danceability;",
@@ -133,13 +158,35 @@ db_songs = {
         "ALTER TABLE songs DROP COLUMN tempo;",
         "ALTER TABLE songs DROP COLUMN time_signature;",
     ],
-    "add column": [
+    "add columns": [
         "ALTER TABLE songs ADD COLUMN created_by VARCHAR;",
         "ALTER TABLE songs ADD COLUMN updated_by VARCHAR;",
     ],
-    "alter column created_by": """UPDATE songs
+    "update columns": [
+        """
+        UPDATE songs
+        SET artist_genres = replace(artist_genres, '[', '')
+        WHERE artist_genres LIKE '[%';
+        """,
+        """
+        UPDATE songs
+        SET artist_genres = replace(artist_genres, ']', '')
+        WHERE artist_genres LIKE '%]';
+        """,
+        """
+        UPDATE songs
         SET created_by = "www.kaggle.com - josephinelsy"
-        WHERE created_by is NULL;""",
+        WHERE created_by is NULL;
+        """,
+        """
+        UPDATE songs
+        SET artist_genres = replace(artist_genres, "'", "")
+        WHERE artist_genres LIKE "%'%";
+        """,
+    ],
+    "rename columns": [
+        "ALTER TABLE songs RENAME COLUMN year TO top_year;",
+    ],
 }
 execute_commands(db_songs, conn)
 
@@ -151,35 +198,39 @@ df.to_sql("movies", conn, if_exists="replace")
 
 db_movies = {
     "drop columns": "ALTER TABLE movies DROP COLUMN status;",
-    "alter column date": """
+    "add columns": [
+        "ALTER TABLE movies ADD COLUMN created_by VARCHAR;",
+        "ALTER TABLE movies ADD COLUMN updated_by VARCHAR;",
+    ],
+    "update columns": [
+        """
         UPDATE movies
         SET date_x =
         substr(date_x, 7,4)||'-'||
         substr(date_x, 1,2)||'-'||
         substr(date_x, 4,2);
         """,
-    "alter column crew": """
+        """
         UPDATE movies
         SET crew = '---'
         WHERE crew is NULL and genre LIKE '%Animation%';
         """,
-    "alter column score": """
+        """
         UPDATE movies
         SET score = round(score/10, 2)
         WHERE score > 0;
         """,
+        """
+        UPDATE movies
+        SET created_by = "www.kaggle.com - ashpalsingh1525"
+        WHERE created_by is NULL;
+        """,
+    ],
     "rename columns": [
         "ALTER TABLE movies RENAME COLUMN names TO title;",
         "ALTER TABLE movies RENAME COLUMN date_x TO premiere;",
         "ALTER TABLE movies RENAME COLUMN budget_x TO budget;",
     ],
-    "add column": [
-        "ALTER TABLE movies ADD COLUMN created_by VARCHAR;",
-        "ALTER TABLE movies ADD COLUMN updated_by VARCHAR;",
-    ],
-    "alter column created_by": """UPDATE movies
-        SET created_by = "www.kaggle.com - ashpalsingh1525"
-        WHERE created_by is NULL;""",
 }
 execute_commands(db_movies, conn)
 
@@ -190,36 +241,56 @@ df.columns = df.columns.str.strip()
 df.to_sql("books", conn, if_exists="replace")
 
 db_books = {
-    "drop columns": [
+    "drop columns #1": [
         "ALTER TABLE books DROP COLUMN URL;",
         "ALTER TABLE books DROP COLUMN 'Unnamed: 0';",
     ],
-    "alter column genres": [
-        """UPDATE books
-        SET Genres = replace(Genres, '[', '')
-        WHERE Genres LIKE '[%';""",
-        """UPDATE books
-        SET Genres = replace(Genres, ']', '')
-        WHERE Genres LIKE '%]';""",
+    "add columns": [
+        "ALTER TABLE books ADD COLUMN rating_reviews INTEGER;",
+        "ALTER TABLE books ADD COLUMN created_by VARCHAR;",
+        "ALTER TABLE books ADD COLUMN updated_by VARCHAR;",
     ],
-    "alter column rating": """UPDATE books
+    "update columns": [
+        """
+        UPDATE books
+        SET Genres = replace(Genres, '[', '')
+        WHERE Genres LIKE '[%';
+        """,
+        """
+        UPDATE books
+        SET Genres = replace(Genres, ']', '')
+        WHERE Genres LIKE '%]';
+        """,
+        """
+        UPDATE books
+        SET Genres = replace(Genres, "'", "")
+        WHERE Genres LIKE "%'%";
+        """,
+        """
+        UPDATE books
         SET Num_Ratings = replace(Num_Ratings, ',', '')
-        WHERE Num_Ratings LIKE '%,%';""",
-    "rename column": [
+        WHERE Num_Ratings LIKE '%,%';
+        """,
+        """
+        UPDATE books
+        SET created_by = "www.kaggle.com - ishikajohari"
+        WHERE created_by is NULL;
+        """,
+        """
+        UPDATE books
+        SET rating_reviews = Num_ratings;
+        """,
+    ],
+    "rename columns": [
         "ALTER TABLE books RENAME COLUMN Book TO book;",
         "ALTER TABLE books RENAME COLUMN Author TO author;",
         "ALTER TABLE books RENAME COLUMN Description TO description;",
         "ALTER TABLE books RENAME COLUMN Genres TO genres;",
         "ALTER TABLE books RENAME COLUMN Avg_Rating TO avg_rating;",
-        "ALTER TABLE books RENAME COLUMN Num_Ratings TO num_ratings;",
     ],
-    "add column": [
-        "ALTER TABLE books ADD COLUMN created_by VARCHAR;",
-        "ALTER TABLE books ADD COLUMN updated_by VARCHAR;",
+    "drop columns #2": [
+        "ALTER TABLE books DROP COLUMN Num_Ratings;"
     ],
-    "alter column created_by": """UPDATE books
-        SET created_by = "www.kaggle.com - ishikajohari"
-        WHERE created_by is NULL;""",
 }
 execute_commands(db_books, conn)
 
