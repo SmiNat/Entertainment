@@ -19,12 +19,12 @@ class Users(Base):
     __tablename__ = "users"
 
     user_id = Column(UUID, primary_key=True, index=True, unique=True)
-    username = Column(String, unique=True, index=True)
-    email = Column(String, unique=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
     first_name = Column(String, nullable=True)
     last_name = Column(String, nullable=True)
-    hashed_password = Column(String)
-    role = Column(String)
+    hashed_password = Column(String, unique=True, nullable=False)
+    role = Column(String, default="user")
     is_active = Column(Boolean, default=True)
     create_timestamp = Column(DateTime, default=datetime.datetime.now())
     update_timestamp = Column(
