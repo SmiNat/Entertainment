@@ -104,8 +104,8 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> None:
         first_name=new_user.first_name,
         last_name=new_user.last_name,
         hashed_password=bcrypt_context.hash(new_user.password.strip()),
-        role=RoleEnum.user,  # for security reasons, all users created
-                             # via API has 'user' role
+        role="user",    # for security reasons, all users created
+                        # via API has 'user' role
     )
 
     try:
