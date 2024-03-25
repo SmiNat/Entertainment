@@ -42,7 +42,7 @@ cursor = conn.cursor()
 csv_file = "data/games_data.csv"
 with open(csv_file, 'rb') as raw_data:
     result = chardet.detect(raw_data.read(100000))
-db_logger.info("#️⃣ File 'games_data.csv' encoding: %s." %result)
+db_logger.info("#️⃣  File 'games_data.csv' encoding: %s." %result)
 df = pd.read_csv(csv_file, encoding="Windows-1252", low_memory=False)
 df.columns = df.columns.str.strip()
 df.to_sql("games", conn, if_exists="replace")
