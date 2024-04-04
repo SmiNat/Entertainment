@@ -3,19 +3,19 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 
-from database import new_engine, new_db, Base
+from database import create_sqlite_engine, create_db, Base
 from main import app
 from routers import users
 from routers.users import get_db, router
 
 test_db = "./tests/test.db"
 
-new_db(test_db)
+create_db(test_db)
 
 # SQLALCHEMY_TEST_DATABASE_URL = "sqlite://"
 SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///./tests/test.db"
 
-engine = new_engine(SQLALCHEMY_TEST_DATABASE_URL)
+engine = create_sqlite_engine(SQLALCHEMY_TEST_DATABASE_URL)
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
