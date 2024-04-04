@@ -61,7 +61,7 @@ class MoviesRequest(BaseModel):
     title: str
     premiere: datetime.date = Field(description="YYYY-MM-DD format.")
     score: float = Field(default=0, ge=0, le=1000)
-    genre: list = Field(max_length=500)
+    genres: list = Field(max_length=500)
     overview: str | None = Field(max_length=500, examples=[None])
     crew: str | None = Field(max_length=500, examples=[None])
     orig_title: str | None = Field(default=None, max_length=200, examples=[None])
@@ -73,7 +73,7 @@ class MoviesRequest(BaseModel):
 
 class MoviesResponse(MoviesRequest):
 
-    index: int
+    id: int
     created_by: str
     updated_by: str
 
@@ -93,7 +93,7 @@ class UserDataRequest(BaseModel):
 
 @router.get("/genres", status_code=200, description="Get all available movie genres.")
 def get_movies_genre(db: db_dependency) -> set:
-    query = select(Movies.genre).distinct()
+    query = select(Movies.genres).distinct()
     genres = db.execute(query).scalars().all()
     unique_genres = set()
     for element in genres:
@@ -170,9 +170,9 @@ async def search_movies(
     if crew is not None:
         query = query.filter(Movies.crew.contains(crew))
     if genre_primary is not None:
-        query = query.filter(Movies.genre.contains(genre_primary))
+        query = query.filter(Movies.genres.contains(genre_primary))
     if genre_secondary is not None:
-        query = query.filter(Movies.genre.contains(genre_secondary))
+        query = query.filter(Movies.genres.contains(genre_secondary))
 
     if query is None:
         raise HTTPException(status_code=404, detail="Movie not found.")
@@ -207,19 +207,19 @@ async def add_movie(
             f"Movie '{movie_request.title}' is already registered in the database.",
         )
 
-    genre_list = movie_request.genre
+    genre_list = movie_request.genres
     await check_genre(db, genre_list)
-    genre = ", ".join(genre_list)
+    genres = ", ".join(genre_list)
 
-    highest_index = db.query(func.max(Movies.index)).first()
+    # highest_index = db.query(func.max(Movies.id)).first()
 
     movie_model = Movies(
         **movie_request.model_dump(),
         created_by=user.get("username"),
         updated_by=user.get("username"),
-        index=(highest_index[0] + 1),
+        # index=(highest_index[0] + 1),
     )
-    movie_model.genre = genre
+    movie_model.genres = genres
 
     db.add(movie_model)
     db.commit()

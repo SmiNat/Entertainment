@@ -100,7 +100,7 @@ async def login_for_access_token(
 ) -> dict[str, str]:
     user = authenticate_user(form_data.username, form_data.password, db)
     token = create_access_token(
-        user.username, str(user.user_id),
+        user.username, str(user.id),
         timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
 

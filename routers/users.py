@@ -45,7 +45,7 @@ class CreateUser(User):
 
 
 class GetUser(User):
-    user_id: uuid.UUID
+    id: uuid.UUID
     role: str
     is_active: bool
     create_timestamp: datetime.datetime
@@ -70,7 +70,7 @@ class ChangePassword(BaseModel):
 async def get_user(username: str, db: db_dependency, user: user_dependency):
 
     authenticated_user = (
-        db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).first()
+        db.query(Users).filter(Users.id == uuid.UUID(user["id"])).first()
     )
     requested_user = db.query(Users).filter(Users.username == username).first()
 
@@ -98,7 +98,7 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> None:
         )
 
     user_model = Users(
-        user_id=uuid.uuid4(),
+        id=uuid.uuid4(),
         username=new_user.username,
         email=new_user.email,
         first_name=new_user.first_name,
@@ -121,7 +121,7 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> None:
 async def update_user(db: db_dependency, user: user_dependency, data: UpdateUser):
 
     authenticated_user = (
-        db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).first()
+        db.query(Users).filter(Users.id == uuid.UUID(user["id"])).first()
     )
 
     for field, value in data.model_dump(exclude_unset=True, exclude_none=True).items():
@@ -134,7 +134,7 @@ async def update_user(db: db_dependency, user: user_dependency, data: UpdateUser
 async def delete_user(db: db_dependency, user: user_dependency):
 
     authenticated_user = (
-        db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).first()
+        db.query(Users).filter(Users.id == uuid.UUID(user["id"])).first()
     )
 
     if not authenticated_user:
@@ -142,7 +142,7 @@ async def delete_user(db: db_dependency, user: user_dependency):
             status.HTTP_404_NOT_FOUND, "No user found in the database."
         )
 
-    db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).delete()
+    db.query(Users).filter(Users.id == uuid.UUID(user["id"])).delete()
     db.commit()
 
 
@@ -152,7 +152,7 @@ async def change_password(
 ):
 
     authenticated_user = (
-        db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).first()
+        db.query(Users).filter(Users.id == uuid.UUID(user["id"])).first()
     )
 
     if not bcrypt_context.verify(
