@@ -105,7 +105,7 @@ def get_movies_genre(db: db_dependency) -> set:
                 for genre in genre_list:
                     genre = str(genre).strip()
                     unique_genres.add(genre.lower())
-    app_logger.info("✅ Number of available movie genres: %s." % len(unique_genres))
+    app_logger.debug("✅ Number of available movie genres: %s." % len(unique_genres))
     return unique_genres
 
 
@@ -146,13 +146,14 @@ async def get_all_movies(
 async def search_movies(
     db: db_dependency,
     title: str = "",
-    country: str = "",
     premiere_since: str = Query(default="1900-1-1", description="Use yyyy-mm-dd."),
     premiere_before: str = Query(default="2050-1-1", description="Use yyyy-mm-dd."),
     score_ge: float = Query(default=0, ge=0, le=10),
     genre_primary: str | None = None,
     genre_secondary: str | None = None,
     crew: str | None = None,
+    language: str | None = None,
+    country_ticker: str | None = None,
     page: int = Query(default=1, gt=0),
 ) -> dict[str, list[Row[_TP]]]:
 
@@ -164,7 +165,6 @@ async def search_movies(
         Movies.premiere <= premiere_before,
         Movies.score >= score_ge,
         Movies.title.contains(title),
-        Movies.country.contains(country),
     )
 
     if crew is not None:
@@ -173,11 +173,15 @@ async def search_movies(
         query = query.filter(Movies.genres.contains(genre_primary))
     if genre_secondary is not None:
         query = query.filter(Movies.genres.contains(genre_secondary))
+    if language is not None:
+        query = query.filter(Movies.orig_lang.contains(language))
+    if country_ticker is not None:
+        query = query.filter(Movies.country.contains(country_ticker))
 
     if query is None:
         raise HTTPException(status_code=404, detail="Movie not found.")
 
-    app_logger.info("✅ Database hits: %s." % len(query.all()))
+    app_logger.debug("✅ Database hits: %s." % len(query.all()))
 
     results = query.offset((page - 1) * 10).limit(10).all()
     return {"number of movies": len(query.all()), "movies": results}
@@ -223,6 +227,7 @@ async def add_movie(
 
     db.add(movie_model)
     db.commit()
+    db.refresh(movie_model)
 
 
 @router.patch("/update/{title}/{premiere}", status_code=204)

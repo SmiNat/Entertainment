@@ -307,6 +307,7 @@ db_movies_temp = {
         SET created_by = "www.kaggle.com - ashpalsingh1525"
         WHERE created_by is NULL;
         """,
+        "UPDATE movies_temp SET orig_lang = trim(orig_lang);",
         "UPDATE movies_temp SET names = '---' WHERE names IS NULL;",
         "UPDATE movies_temp SET date_x = '---' WHERE date_x IS NULL;",
         "UPDATE movies_temp SET genre = '---' WHERE genre IS NULL;",
@@ -322,7 +323,7 @@ db_movies_temp = {
     ],
     "drop duplicate rows": [
         """
-        DELETE FROM  movies_temp
+        DELETE FROM movies_temp
         WHERE rowid NOT IN
         (
         SELECT min(rowid)
