@@ -8,7 +8,6 @@ import pandas as pd
 
 from logger import db_logger
 
-
 pd.set_option("display.width", 300)
 pd.set_option("display.max_columns", 15)
 
@@ -42,40 +41,43 @@ def switch_and_drop_table(table_from: str, table_to: str):
 
 
 # Opening connection to a database
-conn = sqlite3.connect("entertainment.db")
+conn = sqlite3.connect(str(os.environ.get("DATABASE")))
 cursor = conn.cursor()
 
 
 # Database content
 
 # Games table
-create_table = """
-CREATE TABLE games (
-    id                  INTEGER     PRIMARY KEY UNIQUE,
-    title               VARCHAR     NOT NULL,
-    premiere            DATE        NOT NULL,
-    developer           VARCHAR     NOT NULL,
-    publisher           VARCHAR,
-    genres              VARCHAR     NOT NULL,
-    type                VARCHAR,
-    price_eur           FLOAT,
-    price_discounted_eur FLOAT,
-    review_overall      VARCHAR,
-    review_detailed     VARCHAR,
-    reviews_number      INTEGER,
-    reviews_positive    VARCHAR,
-    created_by          VARCHAR,
-    updated_by          VARCHAR,
-    UNIQUE(title, premiere, developer)
-);
-"""
-conn.execute(create_table)
-conn.commit()
+try:
+    conn.execute("SELECT count(*) FROM games;")
+except sqlite3.OperationalError:
+    create_table = """
+    CREATE TABLE games (
+        id                  INTEGER     PRIMARY KEY UNIQUE,
+        title               VARCHAR     NOT NULL,
+        premiere            DATE        NOT NULL,
+        developer           VARCHAR     NOT NULL,
+        publisher           VARCHAR,
+        genres              VARCHAR     NOT NULL,
+        type                VARCHAR,
+        price_eur           FLOAT,
+        price_discounted_eur FLOAT,
+        review_overall      VARCHAR,
+        review_detailed     VARCHAR,
+        reviews_number      INTEGER,
+        reviews_positive    VARCHAR,
+        created_by          VARCHAR,
+        updated_by          VARCHAR,
+        UNIQUE(title, premiere, developer)
+    );
+    """
+    conn.execute(create_table)
+    conn.commit()
 
 csv_file = "data/games_data.csv"
-with open(csv_file, 'rb') as raw_data:
+with open(csv_file, "rb") as raw_data:
     result = chardet.detect(raw_data.read(100000))
-db_logger.info("#️⃣  File 'games_data.csv' encoding: %s." %result)
+db_logger.debug("#️⃣  File 'games_data.csv' encoding: %s." % result)
 df = pd.read_csv(csv_file, encoding="Windows-1252", low_memory=False)
 df.columns = df.columns.str.strip()
 df.to_sql("games_temp", conn, if_exists="replace")
@@ -164,34 +166,37 @@ db_games_temp = {
         GROUP BY title, premiere, developer
         );
         """
-    ]
+    ],
 }
 execute_commands(db_games_temp, conn)
 switch_and_drop_table("games_temp", "games")
 
 # Songs table
-create_table = """
-CREATE TABLE songs (
-    id                  INTEGER     PRIMARY KEY UNIQUE,
-    song_id             VARCHAR     UNIQUE,
-    title               VARCHAR     NOT NULL,
-    artist              VARCHAR     NOT NULL,
-    song_popularity     INTEGER,
-    album_id            VARCHAR,
-    album_name          VARCHAR     NOT NULL,
-    album_premiere      DATE,
-    playlist_id         VARCHAR,
-    playlist_name       VARCHAR,
-    playlist_genre      VARCHAR,
-    playlist_subgenre   VARCHAR,
-    duration_ms         INTEGER,
-    created_by          VARCHAR,
-    updated_by          VARCHAR,
-    UNIQUE(title, artist, album_name)
-);
-"""
-conn.execute(create_table)
-conn.commit()
+try:
+    conn.execute("SELECT count(*) FROM songs;")
+except sqlite3.OperationalError:
+    create_table = """
+    CREATE TABLE songs (
+        id                  INTEGER     PRIMARY KEY UNIQUE,
+        song_id             VARCHAR     UNIQUE,
+        title               VARCHAR     NOT NULL,
+        artist              VARCHAR     NOT NULL,
+        song_popularity     INTEGER,
+        album_id            VARCHAR,
+        album_name          VARCHAR     NOT NULL,
+        album_premiere      DATE,
+        playlist_id         VARCHAR,
+        playlist_name       VARCHAR,
+        playlist_genre      VARCHAR,
+        playlist_subgenre   VARCHAR,
+        duration_ms         INTEGER,
+        created_by          VARCHAR,
+        updated_by          VARCHAR,
+        UNIQUE(title, artist, album_name)
+    );
+    """
+    conn.execute(create_table)
+    conn.commit()
 
 csv_file = "data/spotify_songs.csv"
 df = pd.read_csv(csv_file)
@@ -226,7 +231,7 @@ db_songs_temp = {
         "UPDATE songs_temp SET track_artist = '---' WHERE track_artist IS NULL;",
         "UPDATE songs_temp SET track_album_name = '---' WHERE track_album_name IS NULL;",
     ],
-        "rename columns": [
+    "rename columns": [
         "ALTER TABLE songs_temp RENAME COLUMN track_id TO song_id;",
         "ALTER TABLE songs_temp RENAME COLUMN track_name TO title;",
         "ALTER TABLE songs_temp RENAME COLUMN track_artist TO artist;",
@@ -245,33 +250,36 @@ db_songs_temp = {
         GROUP BY title, artist, album_name
         );
         """
-    ]
+    ],
 }
 execute_commands(db_songs_temp, conn)
 switch_and_drop_table("songs_temp", "songs")
 
 # Movies table
-create_table = """
-CREATE TABLE movies (
-    id              INTEGER     PRIMARY KEY UNIQUE,
-    title           VARCHAR     NOT NULL,
-    premiere        DATE        NOT NULL,
-    score           FLOAT,
-    genres          VARCHAR     NOT NULL,
-    overview        TEXT,
-    crew            TEXT,
-    orig_title      VARCHAR,
-    orig_lang       VARCHAR,
-    budget          FLOAT,
-    revenue         FLOAT,
-    country         VARCHAR,
-    created_by      VARCHAR,
-    updated_by      VARCHAR,
-    UNIQUE(title, premiere)
-);
-"""
-conn.execute(create_table)
-conn.commit()
+try:
+    conn.execute("SELECT count(*) FROM movies;")
+except sqlite3.OperationalError:
+    create_table = """
+    CREATE TABLE movies (
+        id              INTEGER     PRIMARY KEY UNIQUE,
+        title           VARCHAR     NOT NULL,
+        premiere        DATE        NOT NULL,
+        score           FLOAT,
+        genres          VARCHAR     NOT NULL,
+        overview        TEXT,
+        crew            TEXT,
+        orig_title      VARCHAR,
+        orig_lang       VARCHAR,
+        budget          FLOAT,
+        revenue         FLOAT,
+        country         VARCHAR,
+        created_by      VARCHAR,
+        updated_by      VARCHAR,
+        UNIQUE(title, premiere)
+    );
+    """
+    conn.execute(create_table)
+    conn.commit()
 
 csv_file = "data/imdb_movies.csv"
 df = pd.read_csv(csv_file)
@@ -330,29 +338,32 @@ db_movies_temp = {
         GROUP BY title, premiere
         );
         """
-    ]
+    ],
 }
 execute_commands(db_movies_temp, conn)
 switch_and_drop_table("movies_temp", "movies")
 
 
 # Books table
-create_table = """
-CREATE TABLE books (
-    id              INTEGER     PRIMARY KEY UNIQUE,
-    title           VARCHAR     NOT NULL,
-    author          VARCHAR     NOT NULL,
-    description     TEXT,
-    genres          VARCHAR     NOT NULL,
-    avg_rating      FLOAT,
-    rating_reviews  INTEGER,
-    created_by      VARCHAR,
-    updated_by      VARCHAR,
-    UNIQUE(title, author)
-);
-"""
-conn.execute(create_table)
-conn.commit()
+try:
+    conn.execute("SELECT count(*) FROM books;")
+except sqlite3.OperationalError:
+    create_table = """
+    CREATE TABLE books (
+        id              INTEGER     PRIMARY KEY UNIQUE,
+        title           VARCHAR     NOT NULL,
+        author          VARCHAR     NOT NULL,
+        description     TEXT,
+        genres          VARCHAR     NOT NULL,
+        avg_rating      FLOAT,
+        rating_reviews  INTEGER,
+        created_by      VARCHAR,
+        updated_by      VARCHAR,
+        UNIQUE(title, author)
+    );
+    """
+    conn.execute(create_table)
+    conn.commit()
 
 
 csv_file = "data/goodreads_data.csv"
@@ -426,7 +437,7 @@ db_books_temp = {
         GROUP BY title, author
         );
         """
-    ]
+    ],
 }
 execute_commands(db_books_temp, conn)
 switch_and_drop_table("books_temp", "books")

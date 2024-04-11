@@ -88,7 +88,6 @@ class UserDataRequest(BaseModel):
 
 @router.get("/genres", status_code=200, description="Get all available movie genres.")
 def get_movies_genre(db: db_dependency) -> set:
-    print(">>>> func. get_movies_genre")
     query = select(Movies.genres).distinct()
     genres = db.execute(query).scalars().all()
     unique_genres = set()
@@ -116,7 +115,6 @@ async def get_all_movies(
     page_size: int = Query(10, ge=1, le=100),
     page: int = Query(default=1, gt=0),
 ) -> dict[str, list[Row[_TP]]]:
-    print(">>>> func. get_all_movies")
     movie_model = db.query(Movies).all()
 
     if movie_model is None:
@@ -152,7 +150,6 @@ async def search_movies(
     crew: str | None = None,
     page: int = Query(default=1, gt=0),
 ) -> dict[str, list[Row[_TP]]]:
-    print(">>>> func. search_movies")
     check_date(premiere_before)
     check_date(premiere_since)
 
@@ -187,7 +184,6 @@ async def search_movies(
 async def add_movie(
     db: db_dependency, user: user_dependency, movie_request: MoviesRequest
 ):
-    print(">>>> func. add_movie")
     if not user:
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED, "Could not validate credentials."
@@ -212,13 +208,10 @@ async def add_movie(
     await check_genre(db, genre_list)
     genres = ", ".join(genre_list)
 
-    # highest_index = db.query(func.max(Movies.id)).first()
-
     movie_model = Movies(
         **movie_request.model_dump(),
         created_by=user.get("username"),
         updated_by=user.get("username"),
-        # id=(highest_index[0] + 1),
     )
     movie_model.genres = genres
 
