@@ -34,7 +34,6 @@ oauth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 
 class Token(BaseModel):
-
     access_token: str
     token_type: str
 
@@ -54,13 +53,11 @@ def authenticate_user(username: str, password: str, db: Session):
     user = db.query(Users).filter(Users.username == username).first()
     if not user:
         raise HTTPException(
-            status.HTTP_404_NOT_FOUND,
-            f"User '{username}' not found in the database."
+            status.HTTP_404_NOT_FOUND, f"User '{username}' not found in the database."
         )
     if not bcrypt_context.verify(password, user.hashed_password):
         raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED,
-            "Failed Authentication - incorrect password."
+            status.HTTP_401_UNAUTHORIZED, "Failed Authentication - incorrect password."
         )
     return user
 
@@ -100,8 +97,7 @@ async def login_for_access_token(
 ) -> dict[str, str]:
     user = authenticate_user(form_data.username, form_data.password, db)
     token = create_access_token(
-        user.username, str(user.user_id),
-        timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        user.username, str(user.id), timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
 
     return {"access_token": token, "token_type": "bearer"}
