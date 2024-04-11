@@ -1,12 +1,10 @@
 import pytest
-
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 
-from database import create_sqlite_engine, create_db, Base
+from database import Base, create_db, create_sqlite_engine
 from main import app
-from routers import users
-from routers.users import get_db, router
+from routers.users import get_db
 
 test_db = "./tests/test.db"
 
@@ -54,9 +52,10 @@ async def test_create_user():
     # user_id = data["user_id"]
     # username = data["username"]
 
+
 @pytest.mark.asyncio
 async def test_get_user():
-    response = client.get(f"/user/deadpool")
+    response = client.get("/user/deadpool")
     assert response.status_code == 200, response.text
     data = response.json()
     assert data["email"] == "deadpool@example.com"

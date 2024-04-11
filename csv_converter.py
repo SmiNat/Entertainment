@@ -1,13 +1,11 @@
 # NOTE: ALL DATABASES ARE FROM KAGGLE.COM
 
-import os
 import sqlite3
 
 import chardet
 import pandas as pd
 
 from logger import db_logger
-
 
 pd.set_option("display.width", 300)
 pd.set_option("display.max_columns", 15)
@@ -73,9 +71,9 @@ conn.execute(create_table)
 conn.commit()
 
 csv_file = "data/games_data.csv"
-with open(csv_file, 'rb') as raw_data:
+with open(csv_file, "rb") as raw_data:
     result = chardet.detect(raw_data.read(100000))
-db_logger.info("#️⃣  File 'games_data.csv' encoding: %s." %result)
+db_logger.info("#️⃣  File 'games_data.csv' encoding: %s." % result)
 df = pd.read_csv(csv_file, encoding="Windows-1252", low_memory=False)
 df.columns = df.columns.str.strip()
 df.to_sql("games_temp", conn, if_exists="replace")
@@ -164,7 +162,7 @@ db_games_temp = {
         GROUP BY title, premiere, developer
         );
         """
-    ]
+    ],
 }
 execute_commands(db_games_temp, conn)
 switch_and_drop_table("games_temp", "games")
@@ -226,7 +224,7 @@ db_songs_temp = {
         "UPDATE songs_temp SET track_artist = '---' WHERE track_artist IS NULL;",
         "UPDATE songs_temp SET track_album_name = '---' WHERE track_album_name IS NULL;",
     ],
-        "rename columns": [
+    "rename columns": [
         "ALTER TABLE songs_temp RENAME COLUMN track_id TO song_id;",
         "ALTER TABLE songs_temp RENAME COLUMN track_name TO title;",
         "ALTER TABLE songs_temp RENAME COLUMN track_artist TO artist;",
@@ -245,7 +243,7 @@ db_songs_temp = {
         GROUP BY title, artist, album_name
         );
         """
-    ]
+    ],
 }
 execute_commands(db_songs_temp, conn)
 switch_and_drop_table("songs_temp", "songs")
@@ -331,7 +329,7 @@ db_movies_temp = {
         GROUP BY title, premiere
         );
         """
-    ]
+    ],
 }
 execute_commands(db_movies_temp, conn)
 switch_and_drop_table("movies_temp", "movies")
@@ -427,7 +425,7 @@ db_books_temp = {
         GROUP BY title, author
         );
         """
-    ]
+    ],
 }
 execute_commands(db_books_temp, conn)
 switch_and_drop_table("books_temp", "books")

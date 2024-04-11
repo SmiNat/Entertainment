@@ -5,8 +5,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 from logger import db_logger
 
-
-# Note: data from KAGGLE.COM
+# Note: inital db data from KAGGLE.COM
 
 
 def create_db(db_path: str):
@@ -14,23 +13,20 @@ def create_db(db_path: str):
         db_logger.info("➡️  Database already exists.")
     else:
         db_logger.info("➡️  Creating a database... (can take a while)")
-        import csv_converter
+        import csv_converter  # noqa: F401
 
         if os.path.exists(db_path):
             db_logger.info("✅ Database 'entertainment' was successfully created.")
 
 
 def create_sqlite_engine(
-    db_path: str,
-    check_same_thread: bool = False,
-    echo: bool = False,
-    **kwargs
+    db_path: str, check_same_thread: bool = False, echo: bool = False, **kwargs
 ):
     return create_engine(
         db_path,
         connect_args={"check_same_thread": check_same_thread},
         echo=echo,
-        **kwargs
+        **kwargs,
     )
 
 
