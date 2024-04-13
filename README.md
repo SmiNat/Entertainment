@@ -19,7 +19,8 @@ Basic data source: [kaggle.com](https://www.kaggle.com/).
     [*_rust_notify.WatchfilesRustInternalError: error in underlying watcher:
     IO error for operation on /.../entertainment.db-journal: No such file or directory*]
     during the first attempt to run application (moment when new database is set up),
-    just terminate the proccess, delete entertainment.db file that was created
-    during the proccess and try again with commend *uvicorn main:app --reload*
+    just terminate the proccess, (optionally: delete entertainment.db file that
+    was created during the proccess) and try again with commend:
+    *uvicorn main:app --reload*
 4) Use OpenAPI on http://127.0.0.1:8000 to execute endpoints.
 

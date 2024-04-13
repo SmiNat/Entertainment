@@ -1,6 +1,8 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
+from config import config
+
 
 def create_sqlite_engine(
     db_path: str, check_same_thread: bool = False, echo: bool = False, **kwargs
@@ -13,9 +15,7 @@ def create_sqlite_engine(
     )
 
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./entertainment.db"
-
-engine = create_sqlite_engine(SQLALCHEMY_DATABASE_URL)
+engine = create_sqlite_engine(config.DATABASE_URL)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

@@ -46,6 +46,8 @@ cover/
 # Database and logs
 *.log
 *.db
+*.db-journal
+None
 
 # Jupyter Notebook
 .ipynb_checkpoints

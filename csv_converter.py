@@ -1,4 +1,7 @@
-# NOTE: ALL DATABASES ARE FROM KAGGLE.COM
+# Note: all csv files are from kaggle.com.
+# To fulfill database tables structure and restrictions specified in models.py file
+# a few changes are implemented in temporary tables from csv files before
+# inserting the final data to final db tables.
 
 import os
 import sqlite3
@@ -21,6 +24,7 @@ def execute_commands(commands: dict[str:str], connection: sqlite3.Connection) ->
         connection (sqlite3.Connection): already established connection to
             SQLite database.
     """
+    db_logger.info("Transforming kaggle table...")
     for command in commands.values():
         if isinstance(command, list):
             for single_command in command:
@@ -31,6 +35,9 @@ def execute_commands(commands: dict[str:str], connection: sqlite3.Connection) ->
 
 
 def switch_and_drop_table(table_from: str, table_to: str):
+    db_logger.info(
+        f"Inserting data from kaggle {table_from!r} table to {table_to!r} final table..."
+    )
     copy_db = f"INSERT INTO {table_to} SELECT * FROM {table_from};"
     conn.execute(copy_db)
     conn.commit()
@@ -38,10 +45,11 @@ def switch_and_drop_table(table_from: str, table_to: str):
     drop_db = f"DROP TABLE IF EXISTS {table_from};"
     conn.execute(drop_db)
     conn.commit()
+    db_logger.info(f"Table {table_to!r} ready to use.")
 
 
 # Opening connection to a database
-conn = sqlite3.connect(str(os.environ.get("DATABASE")))
+conn = sqlite3.connect(str(os.environ.get("DEV_DATABASE_PATH")))
 cursor = conn.cursor()
 
 
@@ -51,6 +59,7 @@ cursor = conn.cursor()
 try:
     conn.execute("SELECT count(*) FROM games;")
 except sqlite3.OperationalError:
+    db_logger.info("Creating games table...")
     create_table = """
     CREATE TABLE games (
         id                  INTEGER     PRIMARY KEY UNIQUE,
@@ -77,7 +86,7 @@ except sqlite3.OperationalError:
 csv_file = "data/games_data.csv"
 with open(csv_file, "rb") as raw_data:
     result = chardet.detect(raw_data.read(100000))
-db_logger.debug("#️⃣  File 'games_data.csv' encoding: %s." % result)
+db_logger.debug("File 'games_data.csv' encoding: %s." % result)
 df = pd.read_csv(csv_file, encoding="Windows-1252", low_memory=False)
 df.columns = df.columns.str.strip()
 df.to_sql("games_temp", conn, if_exists="replace")
