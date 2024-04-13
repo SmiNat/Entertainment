@@ -9,7 +9,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from database import SessionLocal
-from enums import RoleEnum
 from exceptions import DatabaseError
 from models import Users
 
@@ -45,7 +44,7 @@ class CreateUser(User):
 
 
 class GetUser(User):
-    user_id: uuid.UUID
+    id: uuid.UUID
     role: str
     is_active: bool
     create_timestamp: datetime.datetime
@@ -68,16 +67,13 @@ class ChangePassword(BaseModel):
 
 @router.get("/{username}", status_code=status.HTTP_200_OK, response_model=GetUser)
 async def get_user(username: str, db: db_dependency, user: user_dependency):
-
     authenticated_user = (
-        db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).first()
+        db.query(Users).filter(Users.id == uuid.UUID(user["id"])).first()
     )
     requested_user = db.query(Users).filter(Users.username == username).first()
 
     if not authenticated_user or not requested_user:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, "No user found in the database."
-        )
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No user found in the database.")
 
     if authenticated_user.role != "admin":
         if username != user["username"]:
@@ -91,21 +87,18 @@ async def get_user(username: str, db: db_dependency, user: user_dependency):
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_user(db: db_dependency, new_user: CreateUser) -> None:
-
     if not new_user.password == new_user.confirm_password:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "Passwords does not match."
-        )
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Passwords does not match.")
 
     user_model = Users(
-        user_id=uuid.uuid4(),
+        id=uuid.uuid4(),
         username=new_user.username,
         email=new_user.email,
         first_name=new_user.first_name,
         last_name=new_user.last_name,
         hashed_password=bcrypt_context.hash(new_user.password.strip()),
-        role="user",    # for security reasons, all users created
-                        # via API has 'user' role
+        role="user",  # for security reasons, all users created
+        # via API has 'user' role
     )
 
     try:
@@ -119,9 +112,8 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> None:
 
 @router.patch("/", status_code=status.HTTP_204_NO_CONTENT)
 async def update_user(db: db_dependency, user: user_dependency, data: UpdateUser):
-
     authenticated_user = (
-        db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).first()
+        db.query(Users).filter(Users.id == uuid.UUID(user["id"])).first()
     )
 
     for field, value in data.model_dump(exclude_unset=True, exclude_none=True).items():
@@ -132,17 +124,14 @@ async def update_user(db: db_dependency, user: user_dependency, data: UpdateUser
 
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(db: db_dependency, user: user_dependency):
-
     authenticated_user = (
-        db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).first()
+        db.query(Users).filter(Users.id == uuid.UUID(user["id"])).first()
     )
 
     if not authenticated_user:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, "No user found in the database."
-        )
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No user found in the database.")
 
-    db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).delete()
+    db.query(Users).filter(Users.id == uuid.UUID(user["id"])).delete()
     db.commit()
 
 
@@ -150,9 +139,8 @@ async def delete_user(db: db_dependency, user: user_dependency):
 async def change_password(
     db: db_dependency, user: user_dependency, password: ChangePassword
 ):
-
     authenticated_user = (
-        db.query(Users).filter(Users.user_id == uuid.UUID(user["id"])).first()
+        db.query(Users).filter(Users.id == uuid.UUID(user["id"])).first()
     )
 
     if not bcrypt_context.verify(
@@ -164,9 +152,7 @@ async def change_password(
         )
 
     if not password.new_password.strip() == password.confirm_password.strip():
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "Passwords does not match."
-        )
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Passwords does not match.")
 
     authenticated_user.hashed_password = bcrypt_context.hash(
         password.new_password.strip()
