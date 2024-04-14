@@ -1,6 +1,7 @@
-from config import config
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
+
+from entertainment.config import config
 
 
 def create_sqlite_engine(

@@ -1,6 +1,5 @@
 import datetime
 
-from database import Base
 from sqlalchemy import (
     UUID,
     Boolean,
@@ -15,6 +14,8 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
+
+from entertainment.database import Base
 
 
 class Users(Base):

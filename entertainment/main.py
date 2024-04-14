@@ -1,11 +1,19 @@
+import logging
 import os
 import sqlite3
+from contextlib import asynccontextmanager
 
-from config import config
-from database import Base, engine
 from fastapi import FastAPI
-from logger import db_logger
-from routers import auth, movies, users
+
+from entertainment.config import config
+from entertainment.database import Base, engine
+from entertainment.logging_config import configure_logging
+from entertainment.routers import auth, movies, users
+
+logger = logging.getLogger(__name__)
+
+configure_logging()
+
 
 Base.metadata.create_all(bind=engine)
 
@@ -28,15 +36,22 @@ if os.path.exists(config.DATABASE_PATH):
         .execute("SELECT count(*) FROM movies;")
         .fetchone()[0]
     ):
-        db_logger.info("#️⃣  No initial database content.")
-        db_logger.info("➡️  Updating a database... (can take a while)")
-        import csv_converter as csv_converter  # noqa: F401
+        logger.info("#️⃣  No initial database content.")
+        logger.info("➡️  Updating a database... (can take a while)")
+        import entertainment.csv_converter as csv_converter  # noqa: F401
 
-        db_logger.info("✅ Database was successfully updated.")
+        logger.info("✅ Database was successfully updated.")
     else:
-        db_logger.debug("✅ Database with kaggle initial data is ready to use.")
+        logger.debug("✅ Database with kaggle initial data is ready to use.")
 
-app = FastAPI(title="Entertainment API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    configure_logging()
+    yield
+
+
+app = FastAPI(title="Entertainment API", version="0.1.0", lifespan=lifespan)
 
 app.include_router(auth.router)
 app.include_router(movies.router)

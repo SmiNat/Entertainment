@@ -1,17 +1,20 @@
 import datetime
+import logging
 from typing import Annotated
 
-from database import SessionLocal
 from fastapi import APIRouter, Depends, HTTPException, Query
-from logger import app_logger
-from models import Movies
 from pydantic import BaseModel, Field
 from sqlalchemy import Row, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql._typing import _TP
 from starlette import status
 
+from entertainment.database import SessionLocal
+from entertainment.models import Movies
+
 from .auth import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/movies", tags=["movies"], responses={404: {"description": "Not found."}}
@@ -99,7 +102,7 @@ def get_movies_genre(db: db_dependency) -> set:
                 for genre in genre_list:
                     genre = str(genre).strip()
                     unique_genres.add(genre.lower())
-    app_logger.debug("✅ Number of available movie genres: %s." % len(unique_genres))
+    logger.debug("✅ Number of available movie genres: %s." % len(unique_genres))
     return unique_genres
 
 
@@ -119,7 +122,7 @@ async def get_all_movies(
     if movie_model is None:
         raise HTTPException(status_code=404, detail="Movie not found.")
 
-    app_logger.debug("✅ Database hits: %s records." % len(movie_model))
+    logger.debug("✅ Database hits: %s records." % len(movie_model))
 
     start_index = (page - 1) * page_size
     end_index = start_index + page_size
@@ -173,7 +176,7 @@ async def search_movies(
     if query is None:
         raise HTTPException(status_code=404, detail="Movie not found.")
 
-    app_logger.debug("✅ Database hits: %s." % len(query.all()))
+    logger.debug("✅ Database hits: %s." % len(query.all()))
 
     results = query.offset((page - 1) * 10).limit(10).all()
     return {"number of movies": len(query.all()), "movies": results}

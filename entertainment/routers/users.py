@@ -1,18 +1,21 @@
 import datetime
+import logging
 import uuid
 from typing import Annotated
 
-from database import SessionLocal
-from exceptions import DatabaseError
 from fastapi import APIRouter, Depends, HTTPException, status
-from models import Users
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from entertainment.database import SessionLocal
+from entertainment.exceptions import DatabaseError
+from entertainment.models import Users
+
 from .auth import get_current_user
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/user", tags=["user"])
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

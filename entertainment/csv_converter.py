@@ -3,15 +3,17 @@
 # a few changes are implemented in temporary tables from csv files before
 # inserting the final data to final db tables.
 
+import logging
 import os
 import sqlite3
 
 import chardet
 import pandas as pd
-from logger import db_logger
 
 pd.set_option("display.width", 300)
 pd.set_option("display.max_columns", 15)
+
+logger = logging.getLogger(__name__)
 
 
 def execute_commands(commands: dict[str:str], connection: sqlite3.Connection) -> None:
@@ -23,7 +25,7 @@ def execute_commands(commands: dict[str:str], connection: sqlite3.Connection) ->
         connection (sqlite3.Connection): already established connection to
             SQLite database.
     """
-    db_logger.info("Transforming kaggle table...")
+    logger.debug("Transforming kaggle table...")
     for command in commands.values():
         if isinstance(command, list):
             for single_command in command:
@@ -34,9 +36,10 @@ def execute_commands(commands: dict[str:str], connection: sqlite3.Connection) ->
 
 
 def switch_and_drop_table(table_from: str, table_to: str):
-    db_logger.info(
+    logger.debug(
         f"Inserting data from kaggle {table_from!r} table to {table_to!r} final table..."
     )
+
     copy_db = f"INSERT INTO {table_to} SELECT * FROM {table_from};"
     conn.execute(copy_db)
     conn.commit()
@@ -44,7 +47,7 @@ def switch_and_drop_table(table_from: str, table_to: str):
     drop_db = f"DROP TABLE IF EXISTS {table_from};"
     conn.execute(drop_db)
     conn.commit()
-    db_logger.info(f"Table {table_to!r} ready to use.")
+    logger.debug(f"Table {table_to!r} ready to use.")
 
 
 # Opening connection to a database
@@ -58,7 +61,7 @@ cursor = conn.cursor()
 try:
     conn.execute("SELECT count(*) FROM games;")
 except sqlite3.OperationalError:
-    db_logger.info("Creating games table...")
+    logger.debug("Creating games table...")
     create_table = """
     CREATE TABLE games (
         id                  INTEGER     PRIMARY KEY UNIQUE,
@@ -82,10 +85,10 @@ except sqlite3.OperationalError:
     conn.execute(create_table)
     conn.commit()
 
-csv_file = "../external_data/games_data.csv"
+csv_file = "external_data/games_data.csv"
 with open(csv_file, "rb") as raw_data:
     result = chardet.detect(raw_data.read(100000))
-db_logger.debug("File 'games_data.csv' encoding: %s." % result)
+logger.debug("File 'games_data.csv' encoding: %s." % result)
 df = pd.read_csv(csv_file, encoding="Windows-1252", low_memory=False)
 df.columns = df.columns.str.strip()
 df.to_sql("games_temp", conn, if_exists="replace")
@@ -183,6 +186,7 @@ switch_and_drop_table("games_temp", "games")
 try:
     conn.execute("SELECT count(*) FROM songs;")
 except sqlite3.OperationalError:
+    logger.debug("Creating songs table...")
     create_table = """
     CREATE TABLE songs (
         id                  INTEGER     PRIMARY KEY UNIQUE,
@@ -206,7 +210,7 @@ except sqlite3.OperationalError:
     conn.execute(create_table)
     conn.commit()
 
-csv_file = "../external_data/spotify_songs.csv"
+csv_file = "external_data/spotify_songs.csv"
 df = pd.read_csv(csv_file)
 df.columns = df.columns.str.strip()
 df.to_sql("songs_temp", conn, if_exists="replace")
@@ -267,6 +271,7 @@ switch_and_drop_table("songs_temp", "songs")
 try:
     conn.execute("SELECT count(*) FROM movies;")
 except sqlite3.OperationalError:
+    logger.debug("Creating movies table...")
     create_table = """
     CREATE TABLE movies (
         id              INTEGER     PRIMARY KEY UNIQUE,
@@ -289,7 +294,7 @@ except sqlite3.OperationalError:
     conn.execute(create_table)
     conn.commit()
 
-csv_file = "../external_data/imdb_movies.csv"
+csv_file = "external_data/imdb_movies.csv"
 df = pd.read_csv(csv_file)
 df.columns = df.columns.str.strip()
 df.to_sql("movies_temp", conn, if_exists="replace")
@@ -356,6 +361,7 @@ switch_and_drop_table("movies_temp", "movies")
 try:
     conn.execute("SELECT count(*) FROM books;")
 except sqlite3.OperationalError:
+    logger.debug("Creating books table...")
     create_table = """
     CREATE TABLE books (
         id              INTEGER     PRIMARY KEY UNIQUE,
@@ -374,7 +380,7 @@ except sqlite3.OperationalError:
     conn.commit()
 
 
-csv_file = "../external_data/goodreads_data.csv"
+csv_file = "external_data/goodreads_data.csv"
 df = pd.read_csv(csv_file)
 df.columns = df.columns.str.strip()
 df.to_sql("books_temp", conn, if_exists="replace")
