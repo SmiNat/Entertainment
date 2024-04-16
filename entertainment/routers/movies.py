@@ -89,10 +89,11 @@ class UserDataRequest(BaseModel):
 
 
 @router.get("/genres", status_code=200, description="Get all available movie genres.")
-def get_movies_genre(db: db_dependency) -> set:
+def get_movies_genre(db: db_dependency) -> list:
     query = select(Movies.genres).distinct()
     genres = db.execute(query).scalars().all()
     unique_genres = set()
+    logger.error("Testing: %s." % type(unique_genres))
     for element in genres:
         if element:
             if "," not in element:
@@ -102,8 +103,8 @@ def get_movies_genre(db: db_dependency) -> set:
                 for genre in genre_list:
                     genre = str(genre).strip()
                     unique_genres.add(genre.lower())
-    logger.debug("✅ Number of available movie genres: %s." % len(unique_genres))
-    return unique_genres
+    logger.debug("Number of available movie genres: %s." % len(unique_genres))
+    return sorted(unique_genres)
 
 
 @router.get(
@@ -122,7 +123,7 @@ async def get_all_movies(
     if movie_model is None:
         raise HTTPException(status_code=404, detail="Movie not found.")
 
-    logger.debug("✅ Database hits: %s records." % len(movie_model))
+    logger.debug("Database hits: %s records." % len(movie_model))
 
     start_index = (page - 1) * page_size
     end_index = start_index + page_size
@@ -176,7 +177,7 @@ async def search_movies(
     if query is None:
         raise HTTPException(status_code=404, detail="Movie not found.")
 
-    logger.debug("✅ Database hits: %s." % len(query.all()))
+    logger.debug("Database hits: %s." % len(query.all()))
 
     results = query.offset((page - 1) * 10).limit(10).all()
     return {"number of movies": len(query.all()), "movies": results}

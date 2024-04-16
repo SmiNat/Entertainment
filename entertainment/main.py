@@ -3,7 +3,9 @@ import os
 import sqlite3
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from asgi_correlation_id import CorrelationIdMiddleware
+from fastapi import FastAPI, HTTPException
+from fastapi.exception_handlers import http_exception_handler
 
 from entertainment.config import config
 from entertainment.database import Base, engine
@@ -52,7 +54,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Entertainment API", version="0.1.0", lifespan=lifespan)
+app.add_middleware(CorrelationIdMiddleware)
 
 app.include_router(auth.router)
 app.include_router(movies.router)
 app.include_router(users.router)
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handle_logging(request, exc):
+    logger.error("HTTPException: %s %s" % (exc.status_code, exc.detail))
+    return await http_exception_handler(request, exc)
