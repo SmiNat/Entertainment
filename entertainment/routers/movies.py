@@ -93,7 +93,6 @@ def get_movies_genre(db: db_dependency) -> list:
     query = select(Movies.genres).distinct()
     genres = db.execute(query).scalars().all()
     unique_genres = set()
-    logger.error("Testing: %s." % type(unique_genres))
     for element in genres:
         if element:
             if "," not in element:
@@ -121,7 +120,7 @@ async def get_all_movies(
     movie_model = db.query(Movies).all()
 
     if movie_model is None:
-        raise HTTPException(status_code=404, detail="Movie not found.")
+        raise HTTPException(status_code=404, detail="Movies not found.")
 
     logger.debug("Database hits: %s records." % len(movie_model))
 

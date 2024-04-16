@@ -4,7 +4,7 @@ import sqlite3
 from contextlib import asynccontextmanager
 
 from asgi_correlation_id import CorrelationIdMiddleware
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exception_handlers import http_exception_handler
 
 from entertainment.config import config
@@ -62,6 +62,6 @@ app.include_router(users.router)
 
 
 @app.exception_handler(HTTPException)
-async def http_exception_handle_logging(request, exc):
+async def http_exception_handle_logging(request: Request, exc: HTTPException):
     logger.error("HTTPException: %s %s" % (exc.status_code, exc.detail))
     return await http_exception_handler(request, exc)

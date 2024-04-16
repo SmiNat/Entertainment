@@ -1,3 +1,4 @@
+import logging
 from enum import Enum
 from logging.config import dictConfig
 
@@ -36,13 +37,26 @@ class FontEnd(str, Enum):
     suffix = "\033[0m"
 
 
-# MAPPING = {
-#     "DEBUG": FontColor.white,
-#     "INFO": FontColor.light_blue_cyan,
-#     "WARNING": FontColor.yellow,
-#     "ERROR": FontColor.red,
-#     "CRITICAL": FontBackground.red,
-# }
+class ColoredFormatter(logging.Formatter):
+    MAPPING = {
+        "DEBUG": FontColor.white,
+        "INFO": FontColor.light_blue_cyan,
+        "WARNING": FontColor.yellow,
+        "ERROR": FontColor.red,
+        "CRITICAL": FontBackground.red,
+    }
+
+    def __init__(self, *, format):
+        logging.Formatter.__init__(self, fmt=format)
+
+    def format(self, record):
+        msg = super().format(record)
+        # print(msg)
+        levelname = record.levelname
+        for level, color in self.MAPPING.items():
+            if levelname == level:
+                return f"{color}{msg}{FontEnd.suffix}"
+        # return msg
 
 
 def configure_logging() -> None:
@@ -58,15 +72,13 @@ def configure_logging() -> None:
                 },
             },
             "formatters": {
-                "console_green": {
-                    "class": "logging.Formatter",
-                    "datefmt": "%Y-%m-%d  %H:%M:%S",
-                    "format": f"%(asctime)s.%(msecs)03dZ - %(levelname)-8s - {FontColor.green}{FontType.underline}%(name)s{FontEnd.suffix} - %(filename)s:%(lineno)s {FontColor.yellow} >>> {FontEnd.suffix} [%(correlation_id)s] %(message)s",
+                "libraries": {
+                    "()": ColoredFormatter,
+                    "format": f"%(asctime)sZ - %(levelname)-8s{FontEnd.suffix} - {FontColor.green}{FontType.dark}%(name)s{FontEnd.suffix} - %(filename)s:%(lineno)s {FontColor.yellow} >>> {FontEnd.suffix} [%(correlation_id)s] %(message)s",
                 },
-                "console": {
-                    "class": "logging.Formatter",
-                    "datefmt": "%Y-%m-%d  %H:%M:%S",
-                    "format": f"%(asctime)s.%(msecs)03dZ - %(levelname)-8s - {FontColor.blue}%(name)s{FontEnd.suffix} - %(filename)s:%(lineno)s {FontColor.yellow} >>> {FontEnd.suffix} [%(correlation_id)s] %(message)s",
+                "app": {
+                    "()": ColoredFormatter,
+                    "format": f"%(asctime)sZ - %(levelname)-8s{FontEnd.suffix} - {FontColor.green}%(name)s{FontEnd.suffix} - %(filename)s:%(lineno)s {FontColor.yellow} >>> {FontEnd.suffix} [%(correlation_id)s] %(message)s",
                 },
                 "file": {
                     "class": "logging.Formatter",
@@ -78,13 +90,13 @@ def configure_logging() -> None:
                 "console_libraries": {
                     "class": "logging.StreamHandler",
                     "level": "DEBUG",
-                    "formatter": "console_green",
+                    "formatter": "libraries",
                     "filters": ["correlation_id"],
                 },
                 "console_entertainment": {
                     "class": "logging.StreamHandler",
                     "level": "DEBUG",
-                    "formatter": "console",
+                    "formatter": "app",
                     "filters": ["correlation_id"],
                 },
                 "fixed": {
