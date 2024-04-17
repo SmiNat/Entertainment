@@ -71,9 +71,9 @@ app.include_router(users.router)
 # to write a logger in each HTTPException statement.
 # The downside of this solution is that logs no longer have a specific logger name
 # and filename because all loggers are activated by the code in the main.py file.
-# To receive more information about the exception, the handler will use
-# extract_traceback_data function to select from traceback all data related to
-# the app directory files.
+# To receive more information about the exception, tha app will add extra data
+# to the logger in http_exception_handle_logging function so that it contain either
+# full traceback of an error or selected information from that traceback.
 
 
 def extract_traceback_data():
