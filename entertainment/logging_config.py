@@ -62,7 +62,7 @@ class ColoredFormatter(logging.Formatter):
         *args,
         **kwargs,
     ):
-        datefmt = kwargs.pop("datefmt", "%Y-%m-%dT%H:%M:%S")
+        datefmt = kwargs.pop("datefmt", "%Y-%m-%d %H:%M:%S")
         logging.Formatter.__init__(self, *args, datefmt=datefmt, **kwargs)  # noqa: E501 >> super().__init__(*args, datefmt=datefmt, **kwargs)
 
         if not custom_format:
@@ -81,9 +81,11 @@ class ColoredFormatter(logging.Formatter):
     def format(self, record):
         # Making a copy of a record to prevent altering the message for other loggers
         record = logging.makeLogRecord(record.__dict__)  # noqa: E501 >> or import copy and record = copy.copy(record)
+
         # Changing levelname color depending on logger actual level
         color = self.MAPPING.get(record.levelname, FontColor.default)
         record.levelname = f"{color}{record.levelname:<8}{FontReset.suffix}"
+
         # Formatting the record using desired_format
         self._style._fmt = self.desired_format
         msg = super().format(record)  # noqa: E501 >> msg = logging.Formatter.format(self, record)
@@ -114,9 +116,9 @@ def configure_logging() -> None:
                     "message_color": FontColor.green,
                 },
                 "file": {
-                    "class": "logging.Formatter",
-                    "datefmt": "%Y-%m-%d %H:%M:%S",
-                    "format": "%(asctime)s - %(levelname)8s - %(name)s - %(filename)s:%(lineno)s --- [%(correlation_id)s] %(message)s",
+                    "class": "pythonjsonlogger.jsonlogger.JsonFormatter",  # noqa: E501 >> logging.Formatter
+                    "datefmt": "%Y-%m-%dT%H:%M:%S",
+                    "format": "%(asctime)s %(msecs)03d %(levelname)s %(name)s %(filename)s %(lineno)s %(correlation_id)s %(message)s",
                 },
             },
             "handlers": {
