@@ -102,7 +102,9 @@ def get_movies_genre(db: db_dependency) -> list:
                 for genre in genre_list:
                     genre = str(genre).strip()
                     unique_genres.add(genre.lower())
-    logger.debug("Number of available movie genres: %s." % len(unique_genres))
+    logger.debug(
+        "Get movie genres - number of available movie genres: %s." % len(unique_genres)
+    )
     return sorted(unique_genres)
 
 
@@ -122,7 +124,7 @@ async def get_all_movies(
     if movie_model is None:
         raise HTTPException(status_code=404, detail="Movies not found.")
 
-    logger.debug("Database hits: %s records." % len(movie_model))
+    logger.debug("Get all movies - database hits: %s records." % len(movie_model))
 
     start_index = (page - 1) * page_size
     end_index = start_index + page_size
@@ -176,7 +178,7 @@ async def search_movies(
     if query is None:
         raise HTTPException(status_code=404, detail="Movie not found.")
 
-    logger.debug("Database hits: %s." % len(query.all()))
+    logger.debug("Get on search movies - database hits: %s." % len(query.all()))
 
     results = query.offset((page - 1) * 10).limit(10).all()
     return {"number of movies": len(query.all()), "movies": results}
@@ -219,6 +221,10 @@ async def add_movie(
 
     db.add(movie_model)
     db.commit()
+
+    logger.debug(
+        "Post on add movie: '%s' successfully added to database." % movie_model.title
+    )
 
 
 @router.patch("/update/{title}/{premiere}", status_code=204)

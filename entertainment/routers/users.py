@@ -16,6 +16,7 @@ from entertainment.models import Users
 from .auth import get_current_user
 
 logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/user", tags=["user"])
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -69,21 +70,31 @@ class ChangePassword(BaseModel):
 
 @router.get("/{username}", status_code=status.HTTP_200_OK, response_model=GetUser)
 async def get_user(username: str, db: db_dependency, user: user_dependency):
-    authenticated_user = (
-        db.query(Users).filter(Users.id == uuid.UUID(user["id"])).first()
-    )
     requested_user = db.query(Users).filter(Users.username == username).first()
-
-    if not authenticated_user or not requested_user:
+    if not requested_user:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No user found in the database.")
+
+    try:
+        authenticated_user = (
+            db.query(Users).filter(Users.id == uuid.UUID(user["id"])).first()
+        )
+    except TypeError:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Cannot validate authenicated user. Check if "
+            "the session has not expired and the token is still valid.",
+        )
+
+    if not authenticated_user:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Failed Authentication.")
 
     if authenticated_user.role != "admin":
         if username != user["username"]:
             raise HTTPException(
-                status.HTTP_401_UNAUTHORIZED,
-                "Access to see other users' data is restricted. "
-                "The user can only see personal information.",
+                status.HTTP_403_FORBIDDEN,
+                "Permission denied. Access to see other users' data is restricted. ",
             )
+    logger.debug("Get user - successfully returned a user '%s'." % username)
     return requested_user
 
 
@@ -111,6 +122,10 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> None:
             status.HTTP_400_BAD_REQUEST, detail=f"{DatabaseError(e._message())}"
         )
 
+    logger.debug(
+        "Post on create user - successfully added a user '%s'." % user_model.username
+    )
+
 
 @router.patch("/", status_code=status.HTTP_204_NO_CONTENT)
 async def update_user(db: db_dependency, user: user_dependency, data: UpdateUser):
@@ -122,6 +137,11 @@ async def update_user(db: db_dependency, user: user_dependency, data: UpdateUser
         setattr(authenticated_user, field, value)
 
     db.commit()
+
+    logger.debug(
+        "Patch on update user - successfully updated a user '%s'."
+        % authenticated_user.username
+    )
 
 
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
@@ -135,6 +155,10 @@ async def delete_user(db: db_dependency, user: user_dependency):
 
     db.query(Users).filter(Users.id == uuid.UUID(user["id"])).delete()
     db.commit()
+
+    logger.debug(
+        "Delete user - successfully deleted a user '%s'." % authenticated_user.username
+    )
 
 
 @router.put("/password", status_code=status.HTTP_204_NO_CONTENT)
@@ -161,3 +185,8 @@ async def change_password(
     )
     db.add(authenticated_user)
     db.commit()
+
+    logger.debug(
+        "Put on change password - successfully changed password for a user '%s'."
+        % authenticated_user.username
+    )

@@ -13,6 +13,7 @@ class FontColor(str, Enum):
     red = "\033[91m"
     yellow = "\033[93m"
     white = "\033[97m"
+    default = "\033[39m"
 
 
 class FontBackground(str, Enum):
@@ -20,20 +21,25 @@ class FontBackground(str, Enum):
     blue = "\033[43m"
     green = "\033[42m"
     light_blue_cyan = "\033[46m"
-    purple = "\033[45m"
+    purple_magneta = "\033[45m"
     red = "\033[41m"
     yellow = "\033[43m"
     white = "\033[47m"
+    default = "\033[49m"
 
 
 class FontType(str, Enum):
     bold = "\033[1m"
-    dark = "\033[2m"
+    faint = "\033[2m"
     italics = "\033[3m"
     underline = "\033[4m"
+    conceal = "\033[8m"
+    crossed_out = "\033[9m"
+    bold_off = "\033[22m"
+    default = ""
 
 
-class FontEnd(str, Enum):
+class FontReset(str, Enum):
     suffix = "\033[0m"
 
 
@@ -46,17 +52,42 @@ class ColoredFormatter(logging.Formatter):
         "CRITICAL": FontBackground.red,
     }
 
-    def __init__(self, *, format):
-        logging.Formatter.__init__(self, fmt=format)
+    def __init__(
+        self,
+        custom_format=None,
+        name_color=FontColor.default,
+        name_font_type=FontType.default,
+        message_color=FontColor.default,
+        message_font_type=FontType.default,
+        *args,
+        **kwargs,
+    ):
+        datefmt = kwargs.pop("datefmt", "%Y-%m-%dT%H:%M:%S")
+        logging.Formatter.__init__(self, *args, datefmt=datefmt, **kwargs)  # noqa: E501 >> super().__init__(*args, datefmt=datefmt, **kwargs)
+
+        if not custom_format:
+            self.desired_format = (
+                "%(asctime)s.%(msecs)03dZ - "
+                "%(levelname)-8s - "
+                f"{name_color}{name_font_type}%(name)s{FontReset.suffix} - "
+                "%(filename)s:%(lineno)s - %(funcName)s"
+                f"{FontColor.yellow} >>> {FontReset.suffix} "
+                f"[%(correlation_id)s] "
+                f"{message_color}{message_font_type}%(message)s{FontReset.suffix}"
+            )
+        else:
+            self.desired_format = custom_format
 
     def format(self, record):
-        msg = super().format(record)
-        # print(msg)
-        levelname = record.levelname
-        for level, color in self.MAPPING.items():
-            if levelname == level:
-                return f"{color}{msg}{FontEnd.suffix}"
-        # return msg
+        # Changing levelname color depending on logger actual level
+        # Check if output is a terminal (console) - for some reason, without it, the file logs with formatter set on class logging.Formatter also has the following code imbedded
+        if hasattr(record, "stream"):
+            color = self.MAPPING.get(record.levelname, FontColor.default)
+            record.levelname = f"{color}{record.levelname:<8}{FontReset.suffix}"
+        # Formatting the record using desired_format
+        self._style._fmt = self.desired_format
+        msg = super().format(record)  # noqa: E501 >> msg = super().format(record)  msg = logging.Formatter.format(self, record)
+        return msg
 
 
 def configure_logging() -> None:
@@ -74,11 +105,13 @@ def configure_logging() -> None:
             "formatters": {
                 "libraries": {
                     "()": ColoredFormatter,
-                    "format": f"%(asctime)sZ - %(levelname)-8s{FontEnd.suffix} - {FontColor.green}{FontType.dark}%(name)s{FontEnd.suffix} - %(filename)s:%(lineno)s {FontColor.yellow} >>> {FontEnd.suffix} [%(correlation_id)s] %(message)s",
+                    "name_color": FontColor.green,
+                    "name_font_type": FontType.faint,
                 },
                 "app": {
                     "()": ColoredFormatter,
-                    "format": f"%(asctime)sZ - %(levelname)-8s{FontEnd.suffix} - {FontColor.green}%(name)s{FontEnd.suffix} - %(filename)s:%(lineno)s {FontColor.yellow} >>> {FontEnd.suffix} [%(correlation_id)s] %(message)s",
+                    "name_color": FontColor.green,
+                    "message_color": FontColor.green,
                 },
                 "file": {
                     "class": "logging.Formatter",
