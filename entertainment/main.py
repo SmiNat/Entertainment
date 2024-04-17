@@ -123,12 +123,10 @@ async def http_exception_handle_logging(
     additional_info = extract_traceback_data()
     # Log the HTTPException with stack trace
     if display_traceback:
-        logger.error(
-            f"HTTPException: {exc.status_code}, {exc.detail} | Additional information: {additional_info}."
-            f"\n{stack_trace}"
-        )
+        logger.error(f"HTTPException: {exc.status_code}, {exc.detail} \n{stack_trace}")
     else:
         logger.error(
-            f"HTTPException: {exc.status_code}, {exc.detail} | Additional information: {additional_info}."
+            f"HTTPException: {exc.status_code}, {exc.detail} | "
+            f"Additional information: {additional_info}."
         )
     return await http_exception_handler(request, exc)

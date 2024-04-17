@@ -79,14 +79,14 @@ class ColoredFormatter(logging.Formatter):
             self.desired_format = custom_format
 
     def format(self, record):
+        # Making a copy of a record to prevent altering the message for other loggers
+        record = logging.makeLogRecord(record.__dict__)  # noqa: E501 >> or import copy and record = copy.copy(record)
         # Changing levelname color depending on logger actual level
-        # Check if output is a terminal (console) - for some reason, without it, the file logs with formatter set on class logging.Formatter also has the following code imbedded
-        if hasattr(record, "stream"):
-            color = self.MAPPING.get(record.levelname, FontColor.default)
-            record.levelname = f"{color}{record.levelname:<8}{FontReset.suffix}"
+        color = self.MAPPING.get(record.levelname, FontColor.default)
+        record.levelname = f"{color}{record.levelname:<8}{FontReset.suffix}"
         # Formatting the record using desired_format
         self._style._fmt = self.desired_format
-        msg = super().format(record)  # noqa: E501 >> msg = super().format(record)  msg = logging.Formatter.format(self, record)
+        msg = super().format(record)  # noqa: E501 >> msg = logging.Formatter.format(self, record)
         return msg
 
 
