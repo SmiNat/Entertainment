@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from entertainment.database import SessionLocal
+from entertainment.enums import UserRole
 from entertainment.exceptions import DatabaseError
 from entertainment.models import Users
 
@@ -88,7 +89,7 @@ async def get_user(username: str, db: db_dependency, user: user_dependency):
     if not authenticated_user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Failed Authentication.")
 
-    if authenticated_user.role != "admin":
+    if authenticated_user.role != UserRole.admin:
         if username != user["username"]:
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN,
@@ -110,8 +111,7 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> None:
         first_name=new_user.first_name,
         last_name=new_user.last_name,
         hashed_password=bcrypt_context.hash(new_user.password.strip()),
-        role="user",  # for security reasons, all users created
-        # via API has 'user' role
+        role=UserRole.user,  # for security reasons, all users created via API has 'user' role
     )
 
     try:

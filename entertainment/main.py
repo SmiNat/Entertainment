@@ -13,6 +13,9 @@ from entertainment.database import Base, engine
 from entertainment.logging_config import configure_logging
 from entertainment.routers import auth, movies, users
 
+# Setting logger
+LOG_FULL_TRACEBACK = False
+
 logger = logging.getLogger(__name__)
 
 configure_logging()
@@ -115,18 +118,22 @@ def extract_traceback_data():
 
 @app.exception_handler(HTTPException)
 async def http_exception_handle_logging(
-    request: Request, exc: HTTPException, display_traceback: bool = False
+    request: Request,
+    exc: HTTPException,
+    display_traceback: bool = LOG_FULL_TRACEBACK,
 ):
-    # Get the stack trace information
-    stack_trace = traceback.format_exc()
-    # Get the filename and line number where the exception was raised within your application
-    additional_info = extract_traceback_data()
-    # Log the HTTPException with stack trace
     if display_traceback:
-        logger.error(f"HTTPException: {exc.status_code}, {exc.detail} \n{stack_trace}")
+        # Get the full stack trace information
+        additional_info = traceback.format_exc().split("\n")
     else:
-        logger.error(
-            f"HTTPException: {exc.status_code}, {exc.detail} | "
-            f"Additional information: {additional_info}."
-        )
+        # Get the filename, line number an function name where the exception
+        # was raised within your application
+        additional_info = extract_traceback_data()
+
+    # Log the HTTPException with stack trace
+    logger.error(
+        f"HTTPException: {exc.status_code}, {exc.detail}",
+        extra={"additional information": additional_info},
+    )
+
     return await http_exception_handler(request, exc)

@@ -1,46 +1,8 @@
 import logging
-from enum import Enum
 from logging.config import dictConfig
 
 from entertainment.config import DevConfig, config
-
-
-class FontColor(str, Enum):
-    blue = "\033[94m"
-    green = "\033[92m"
-    light_blue_cyan = "\033[96m"
-    purple_magneta = "\033[95m"
-    red = "\033[91m"
-    yellow = "\033[93m"
-    white = "\033[97m"
-    default = "\033[39m"
-
-
-class FontBackground(str, Enum):
-    black = "\033[40m"
-    blue = "\033[43m"
-    green = "\033[42m"
-    light_blue_cyan = "\033[46m"
-    purple_magneta = "\033[45m"
-    red = "\033[41m"
-    yellow = "\033[43m"
-    white = "\033[47m"
-    default = "\033[49m"
-
-
-class FontType(str, Enum):
-    bold = "\033[1m"
-    faint = "\033[2m"
-    italics = "\033[3m"
-    underline = "\033[4m"
-    conceal = "\033[8m"
-    crossed_out = "\033[9m"
-    bold_off = "\033[22m"
-    default = ""
-
-
-class FontReset(str, Enum):
-    suffix = "\033[0m"
+from entertainment.enums import FontBackground, FontColor, FontReset, FontType
 
 
 class ColoredFormatter(logging.Formatter):
@@ -81,6 +43,10 @@ class ColoredFormatter(logging.Formatter):
     def format(self, record):
         # Making a copy of a record to prevent altering the message for other loggers
         record = logging.makeLogRecord(record.__dict__)  # noqa: E501 >> or import copy and record = copy.copy(record)
+
+        extra_info = record.__dict__.pop("additional information", "")
+        if extra_info:
+            record.msg += f"\nAdditional information: {extra_info}"
 
         # Changing levelname color depending on logger actual level
         color = self.MAPPING.get(record.levelname, FontColor.default)
@@ -140,6 +106,7 @@ def configure_logging() -> None:
                     "formatter": "file",
                     "filename": "logs_warnings.log",
                     "filters": ["correlation_id"],
+                    "encoding": "utf-8",
                 },
                 "rotating": {
                     "class": "logging.handlers.RotatingFileHandler",
@@ -150,6 +117,7 @@ def configure_logging() -> None:
                     "maxBytes": 1024 * 512,  # 0.5MB
                     "backupCount": 3,
                     "filters": ["correlation_id"],
+                    "encoding": "utf-8",
                 },
             },
             "loggers": {
