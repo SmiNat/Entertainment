@@ -45,6 +45,7 @@ cover/
 
 # Database and logs
 *.log
+*.log.*
 *.db
 *.db-journal
 None
@@ -69,6 +70,8 @@ entert_env
 ### Private ###
 # private files
 OLD/
+OLD_PRIV
 test.py
 testowy.py
 todo.*
+logger.py
