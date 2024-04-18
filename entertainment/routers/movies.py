@@ -1,4 +1,5 @@
 import datetime
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -6,15 +7,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import Row, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql._typing import _TP
-from sqlalchemy.sql.expression import func
 from starlette import status
 
-from database import SessionLocal
-from models import Movies
-from logger import app_logger
+from entertainment.database import SessionLocal
+from entertainment.models import Movies
 
 from .auth import get_current_user
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/movies", tags=["movies"], responses={404: {"description": "Not found."}}
@@ -57,11 +57,10 @@ async def check_genre(db: Session, genres: list[str]):
 
 
 class MoviesRequest(BaseModel):
-
     title: str
     premiere: datetime.date = Field(description="YYYY-MM-DD format.")
     score: float = Field(default=0, ge=0, le=1000)
-    genres: list = Field(max_length=500)
+    genres: list[str] = Field(max_length=500)
     overview: str | None = Field(max_length=500, examples=[None])
     crew: str | None = Field(max_length=500, examples=[None])
     orig_title: str | None = Field(default=None, max_length=200, examples=[None])
@@ -72,14 +71,12 @@ class MoviesRequest(BaseModel):
 
 
 class MoviesResponse(MoviesRequest):
-
     id: int
     created_by: str
     updated_by: str
 
 
 class UserDataRequest(BaseModel):
-
     # data_id = Column(Integer, primary_key=True, index=True, unique=True)
     finished: bool = False
     vote: int = Field(default=None, ge=0, le=10)
@@ -92,7 +89,7 @@ class UserDataRequest(BaseModel):
 
 
 @router.get("/genres", status_code=200, description="Get all available movie genres.")
-def get_movies_genre(db: db_dependency) -> set:
+def get_movies_genre(db: db_dependency) -> list:
     query = select(Movies.genres).distinct()
     genres = db.execute(query).scalars().all()
     unique_genres = set()
@@ -105,8 +102,10 @@ def get_movies_genre(db: db_dependency) -> set:
                 for genre in genre_list:
                     genre = str(genre).strip()
                     unique_genres.add(genre.lower())
-    app_logger.debug("✅ Number of available movie genres: %s." % len(unique_genres))
-    return unique_genres
+    logger.debug(
+        "Get movie genres - number of available movie genres: %s." % len(unique_genres)
+    )
+    return sorted(unique_genres)
 
 
 @router.get(
@@ -120,13 +119,12 @@ async def get_all_movies(
     page_size: int = Query(10, ge=1, le=100),
     page: int = Query(default=1, gt=0),
 ) -> dict[str, list[Row[_TP]]]:
-
     movie_model = db.query(Movies).all()
 
     if movie_model is None:
-        raise HTTPException(status_code=404, detail="Movie not found.")
+        raise HTTPException(status_code=404, detail="Movies not found.")
 
-    app_logger.info("✅ Database hits: %s records." % len(movie_model))
+    logger.debug("Get all movies - database hits: %s records." % len(movie_model))
 
     start_index = (page - 1) * page_size
     end_index = start_index + page_size
@@ -151,12 +149,12 @@ async def search_movies(
     score_ge: float = Query(default=0, ge=0, le=10),
     genre_primary: str | None = None,
     genre_secondary: str | None = None,
-    crew: str | None = None,
+    country: str | None = None,
     language: str | None = None,
+    crew: str | None = None,
     country_ticker: str | None = None,
     page: int = Query(default=1, gt=0),
 ) -> dict[str, list[Row[_TP]]]:
-
     check_date(premiere_before)
     check_date(premiere_since)
 
@@ -173,15 +171,15 @@ async def search_movies(
         query = query.filter(Movies.genres.contains(genre_primary))
     if genre_secondary is not None:
         query = query.filter(Movies.genres.contains(genre_secondary))
+    if country is not None:
+        query = query.filter(Movies.country.contains(country))
     if language is not None:
         query = query.filter(Movies.orig_lang.contains(language))
-    if country_ticker is not None:
-        query = query.filter(Movies.country.contains(country_ticker))
 
     if query is None:
         raise HTTPException(status_code=404, detail="Movie not found.")
 
-    app_logger.debug("✅ Database hits: %s." % len(query.all()))
+    logger.debug("Get on search movies - database hits: %s." % len(query.all()))
 
     results = query.offset((page - 1) * 10).limit(10).all()
     return {"number of movies": len(query.all()), "movies": results}
@@ -215,19 +213,20 @@ async def add_movie(
     await check_genre(db, genre_list)
     genres = ", ".join(genre_list)
 
-    # highest_index = db.query(func.max(Movies.id)).first()
-
     movie_model = Movies(
         **movie_request.model_dump(),
         created_by=user.get("username"),
         updated_by=user.get("username"),
-        # index=(highest_index[0] + 1),
     )
     movie_model.genres = genres
 
     db.add(movie_model)
     db.commit()
     db.refresh(movie_model)
+
+    logger.debug(
+        "Post on add movie: '%s' successfully added to database." % movie_model.title
+    )
 
 
 @router.patch("/update/{title}/{premiere}", status_code=204)

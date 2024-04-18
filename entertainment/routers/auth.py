@@ -13,8 +13,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from starlette import status
 
-from database import SessionLocal
-from models import Users
+from entertainment.database import SessionLocal
+from entertainment.models import Users
 
 load_dotenv()
 
@@ -23,18 +23,19 @@ load_dotenv()
 # and fails because it's loading modules that no longer exist in bcrypt 4.1.x.
 logging.getLogger("passlib").setLevel(logging.ERROR)
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/auth", tags=["authorization"])
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
 ALGORITHM = os.environ.get("ALGORITHM")
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 5
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 
 class Token(BaseModel):
-
     access_token: str
     token_type: str
 
@@ -54,14 +55,13 @@ def authenticate_user(username: str, password: str, db: Session):
     user = db.query(Users).filter(Users.username == username).first()
     if not user:
         raise HTTPException(
-            status.HTTP_404_NOT_FOUND,
-            f"User '{username}' not found in the database."
+            status.HTTP_404_NOT_FOUND, f"User '{username}' not found in the database."
         )
     if not bcrypt_context.verify(password, user.hashed_password):
         raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED,
-            "Failed Authentication - incorrect password."
+            status.HTTP_401_UNAUTHORIZED, "Failed Authentication - incorrect password."
         )
+    logger.debug("Authenticated user: '%s'." % user.username)
     return user
 
 
@@ -74,6 +74,9 @@ def create_access_token(
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     payload_to_encode.update({"exp": expire})
+
+    logger.debug("Access token created for the user '%s'." % username)
+
     return jwt.encode(payload_to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
@@ -86,6 +89,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
             return HTTPException(
                 status.HTTP_401_UNAUTHORIZED, "Could not validate credentials."
             )
+        logger.debug("Current user: '%s'." % username)
         return {"username": username, "id": user_id}
     except JWTError:
         return HTTPException(
@@ -100,8 +104,9 @@ async def login_for_access_token(
 ) -> dict[str, str]:
     user = authenticate_user(form_data.username, form_data.password, db)
     token = create_access_token(
-        user.username, str(user.id),
-        timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        user.username, str(user.id), timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
+
+    logger.debug("Access token returned for the user '%s'." % user.username)
 
     return {"access_token": token, "token_type": "bearer"}

@@ -1,14 +1,29 @@
-# NOTE: ALL DATABASES ARE FROM KAGGLE.COM
+# Note: all csv files are from kaggle.com.
+# To fulfill database tables structure and restrictions specified in models.py file
+# a few changes are implemented in temporary tables from csv files before
+# inserting the final data to final db tables.
 
+import logging
+import os
 import sqlite3
 
 import chardet
 import pandas as pd
 
-from logger import db_logger
-
 pd.set_option("display.width", 300)
 pd.set_option("display.max_columns", 15)
+
+logger = logging.getLogger(__name__)
+
+
+def create_table(table_name: str, query: str, connection: sqlite3.Connection) -> None:
+    """Creates a new table in the database if it does not exists."""
+    try:
+        connection.execute("SELECT count(*) FROM %s LIMIT 1;" % table_name)
+    except sqlite3.OperationalError:
+        logger.debug("Creating %s table..." % table_name)
+        connection.execute(query)
+        connection.commit()
 
 
 def execute_commands(commands: dict[str:str], connection: sqlite3.Connection) -> None:
@@ -20,6 +35,7 @@ def execute_commands(commands: dict[str:str], connection: sqlite3.Connection) ->
         connection (sqlite3.Connection): already established connection to
             SQLite database.
     """
+    logger.debug("Transforming kaggle table...")
     for command in commands.values():
         if isinstance(command, list):
             for single_command in command:
@@ -30,6 +46,10 @@ def execute_commands(commands: dict[str:str], connection: sqlite3.Connection) ->
 
 
 def switch_and_drop_table(table_from: str, table_to: str):
+    logger.debug(
+        f"Inserting data from kaggle {table_from!r} table to {table_to!r} final table..."
+    )
+
     copy_db = f"INSERT INTO {table_to} SELECT * FROM {table_from};"
     conn.execute(copy_db)
     conn.commit()
@@ -37,43 +57,43 @@ def switch_and_drop_table(table_from: str, table_to: str):
     drop_db = f"DROP TABLE IF EXISTS {table_from};"
     conn.execute(drop_db)
     conn.commit()
+    logger.debug(f"Table {table_to!r} ready to use.")
 
 
 # Opening connection to a database
-conn = sqlite3.connect("entertainment.db")
+conn = sqlite3.connect(str(os.environ.get("DEV_DATABASE_PATH")))
 cursor = conn.cursor()
 
 
 # Database content
 
 # Games table
-create_table = """
-CREATE TABLE games (
-    id                  INTEGER     PRIMARY KEY UNIQUE,
-    title               VARCHAR     NOT NULL,
-    premiere            DATE        NOT NULL,
-    developer           VARCHAR     NOT NULL,
-    publisher           VARCHAR,
-    genres              VARCHAR     NOT NULL,
-    type                VARCHAR,
-    price_eur           FLOAT,
-    price_discounted_eur FLOAT,
-    review_overall      VARCHAR,
-    review_detailed     VARCHAR,
-    reviews_number      INTEGER,
-    reviews_positive    VARCHAR,
-    created_by          VARCHAR,
-    updated_by          VARCHAR,
-    UNIQUE(title, premiere, developer)
-);
+create_table_query = """
+    CREATE TABLE games (
+        id                  INTEGER     PRIMARY KEY UNIQUE,
+        title               VARCHAR     NOT NULL,
+        premiere            DATE        NOT NULL,
+        developer           VARCHAR     NOT NULL,
+        publisher           VARCHAR,
+        genres              VARCHAR     NOT NULL,
+        type                VARCHAR,
+        price_eur           FLOAT,
+        price_discounted_eur FLOAT,
+        review_overall      VARCHAR,
+        review_detailed     VARCHAR,
+        reviews_number      INTEGER,
+        reviews_positive    VARCHAR,
+        created_by          VARCHAR,
+        updated_by          VARCHAR,
+        UNIQUE(title, premiere, developer)
+    );
 """
-conn.execute(create_table)
-conn.commit()
+create_table("games", create_table_query, conn)
 
-csv_file = "data/games_data.csv"
+csv_file = "external_data/games_data.csv"
 with open(csv_file, "rb") as raw_data:
     result = chardet.detect(raw_data.read(100000))
-db_logger.info("#️⃣  File 'games_data.csv' encoding: %s." % result)
+logger.debug("File 'games_data.csv' encoding: %s." % result)
 df = pd.read_csv(csv_file, encoding="Windows-1252", low_memory=False)
 df.columns = df.columns.str.strip()
 df.to_sql("games_temp", conn, if_exists="replace")
@@ -167,31 +187,31 @@ db_games_temp = {
 execute_commands(db_games_temp, conn)
 switch_and_drop_table("games_temp", "games")
 
-# Songs table
-create_table = """
-CREATE TABLE songs (
-    id                  INTEGER     PRIMARY KEY UNIQUE,
-    song_id             VARCHAR     UNIQUE,
-    title               VARCHAR     NOT NULL,
-    artist              VARCHAR     NOT NULL,
-    song_popularity     INTEGER,
-    album_id            VARCHAR,
-    album_name          VARCHAR     NOT NULL,
-    album_premiere      DATE,
-    playlist_id         VARCHAR,
-    playlist_name       VARCHAR,
-    playlist_genre      VARCHAR,
-    playlist_subgenre   VARCHAR,
-    duration_ms         INTEGER,
-    created_by          VARCHAR,
-    updated_by          VARCHAR,
-    UNIQUE(title, artist, album_name)
-);
-"""
-conn.execute(create_table)
-conn.commit()
 
-csv_file = "data/spotify_songs.csv"
+# Songs table
+create_table_query = """
+    CREATE TABLE songs (
+        id                  INTEGER     PRIMARY KEY UNIQUE,
+        song_id             VARCHAR     UNIQUE,
+        title               VARCHAR     NOT NULL,
+        artist              VARCHAR     NOT NULL,
+        song_popularity     INTEGER,
+        album_id            VARCHAR,
+        album_name          VARCHAR     NOT NULL,
+        album_premiere      DATE,
+        playlist_id         VARCHAR,
+        playlist_name       VARCHAR,
+        playlist_genre      VARCHAR,
+        playlist_subgenre   VARCHAR,
+        duration_ms         INTEGER,
+        created_by          VARCHAR,
+        updated_by          VARCHAR,
+        UNIQUE(title, artist, album_name)
+    );
+"""
+create_table("songs", create_table_query, conn)
+
+csv_file = "external_data/spotify_songs.csv"
 df = pd.read_csv(csv_file)
 df.columns = df.columns.str.strip()
 df.to_sql("songs_temp", conn, if_exists="replace")
@@ -248,30 +268,30 @@ db_songs_temp = {
 execute_commands(db_songs_temp, conn)
 switch_and_drop_table("songs_temp", "songs")
 
-# Movies table
-create_table = """
-CREATE TABLE movies (
-    id              INTEGER     PRIMARY KEY UNIQUE,
-    title           VARCHAR     NOT NULL,
-    premiere        DATE        NOT NULL,
-    score           FLOAT,
-    genres          VARCHAR     NOT NULL,
-    overview        TEXT,
-    crew            TEXT,
-    orig_title      VARCHAR,
-    orig_lang       VARCHAR,
-    budget          FLOAT,
-    revenue         FLOAT,
-    country         VARCHAR,
-    created_by      VARCHAR,
-    updated_by      VARCHAR,
-    UNIQUE(title, premiere)
-);
-"""
-conn.execute(create_table)
-conn.commit()
 
-csv_file = "data/imdb_movies.csv"
+# Movies table
+create_table_query = """
+    CREATE TABLE movies (
+        id              INTEGER     PRIMARY KEY UNIQUE,
+        title           VARCHAR     NOT NULL,
+        premiere        DATE        NOT NULL,
+        score           FLOAT,
+        genres          VARCHAR     NOT NULL,
+        overview        TEXT,
+        crew            TEXT,
+        orig_title      VARCHAR,
+        orig_lang       VARCHAR,
+        budget          FLOAT,
+        revenue         FLOAT,
+        country         VARCHAR,
+        created_by      VARCHAR,
+        updated_by      VARCHAR,
+        UNIQUE(title, premiere)
+    );
+"""
+create_table("movies", create_table_query, conn)
+
+csv_file = "external_data/imdb_movies.csv"
 df = pd.read_csv(csv_file)
 df.columns = df.columns.str.strip()
 df.to_sql("movies_temp", conn, if_exists="replace")
@@ -336,25 +356,23 @@ switch_and_drop_table("movies_temp", "movies")
 
 
 # Books table
-create_table = """
-CREATE TABLE books (
-    id              INTEGER     PRIMARY KEY UNIQUE,
-    title           VARCHAR     NOT NULL,
-    author          VARCHAR     NOT NULL,
-    description     TEXT,
-    genres          VARCHAR     NOT NULL,
-    avg_rating      FLOAT,
-    rating_reviews  INTEGER,
-    created_by      VARCHAR,
-    updated_by      VARCHAR,
-    UNIQUE(title, author)
-);
+create_table_query = """
+    CREATE TABLE books (
+        id              INTEGER     PRIMARY KEY UNIQUE,
+        title           VARCHAR     NOT NULL,
+        author          VARCHAR     NOT NULL,
+        description     TEXT,
+        genres          VARCHAR     NOT NULL,
+        avg_rating      FLOAT,
+        rating_reviews  INTEGER,
+        created_by      VARCHAR,
+        updated_by      VARCHAR,
+        UNIQUE(title, author)
+    );
 """
-conn.execute(create_table)
-conn.commit()
+create_table("books", create_table_query, conn)
 
-
-csv_file = "data/goodreads_data.csv"
+csv_file = "external_data/goodreads_data.csv"
 df = pd.read_csv(csv_file)
 df.columns = df.columns.str.strip()
 df.to_sql("books_temp", conn, if_exists="replace")

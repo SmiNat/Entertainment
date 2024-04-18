@@ -15,7 +15,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
-from database import Base
+from entertainment.database import Base
 
 
 class Users(Base):
