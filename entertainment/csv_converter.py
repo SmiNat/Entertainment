@@ -16,6 +16,16 @@ pd.set_option("display.max_columns", 15)
 logger = logging.getLogger(__name__)
 
 
+def create_table(table_name: str, query: str, connection: sqlite3.Connection) -> None:
+    """Creates a new table in the database if it does not exists."""
+    try:
+        connection.execute("SELECT count(*) FROM %s LIMIT 1;" % table_name)
+    except sqlite3.OperationalError:
+        logger.debug("Creating %s table..." % table_name)
+        connection.execute(query)
+        connection.commit()
+
+
 def execute_commands(commands: dict[str:str], connection: sqlite3.Connection) -> None:
     """Execute commands on SQLite database on already established connection.
     Note: does not open or close connection to the database, just uses the existing one.
@@ -58,11 +68,7 @@ cursor = conn.cursor()
 # Database content
 
 # Games table
-try:
-    conn.execute("SELECT count(*) FROM games;")
-except sqlite3.OperationalError:
-    logger.debug("Creating games table...")
-    create_table = """
+create_table_query = """
     CREATE TABLE games (
         id                  INTEGER     PRIMARY KEY UNIQUE,
         title               VARCHAR     NOT NULL,
@@ -81,9 +87,8 @@ except sqlite3.OperationalError:
         updated_by          VARCHAR,
         UNIQUE(title, premiere, developer)
     );
-    """
-    conn.execute(create_table)
-    conn.commit()
+"""
+create_table("games", create_table_query, conn)
 
 csv_file = "external_data/games_data.csv"
 with open(csv_file, "rb") as raw_data:
@@ -182,12 +187,9 @@ db_games_temp = {
 execute_commands(db_games_temp, conn)
 switch_and_drop_table("games_temp", "games")
 
+
 # Songs table
-try:
-    conn.execute("SELECT count(*) FROM songs;")
-except sqlite3.OperationalError:
-    logger.debug("Creating songs table...")
-    create_table = """
+create_table_query = """
     CREATE TABLE songs (
         id                  INTEGER     PRIMARY KEY UNIQUE,
         song_id             VARCHAR     UNIQUE,
@@ -206,9 +208,8 @@ except sqlite3.OperationalError:
         updated_by          VARCHAR,
         UNIQUE(title, artist, album_name)
     );
-    """
-    conn.execute(create_table)
-    conn.commit()
+"""
+create_table("songs", create_table_query, conn)
 
 csv_file = "external_data/spotify_songs.csv"
 df = pd.read_csv(csv_file)
@@ -267,12 +268,9 @@ db_songs_temp = {
 execute_commands(db_songs_temp, conn)
 switch_and_drop_table("songs_temp", "songs")
 
+
 # Movies table
-try:
-    conn.execute("SELECT count(*) FROM movies;")
-except sqlite3.OperationalError:
-    logger.debug("Creating movies table...")
-    create_table = """
+create_table_query = """
     CREATE TABLE movies (
         id              INTEGER     PRIMARY KEY UNIQUE,
         title           VARCHAR     NOT NULL,
@@ -290,9 +288,8 @@ except sqlite3.OperationalError:
         updated_by      VARCHAR,
         UNIQUE(title, premiere)
     );
-    """
-    conn.execute(create_table)
-    conn.commit()
+"""
+create_table("movies", create_table_query, conn)
 
 csv_file = "external_data/imdb_movies.csv"
 df = pd.read_csv(csv_file)
@@ -358,11 +355,7 @@ switch_and_drop_table("movies_temp", "movies")
 
 
 # Books table
-try:
-    conn.execute("SELECT count(*) FROM books;")
-except sqlite3.OperationalError:
-    logger.debug("Creating books table...")
-    create_table = """
+create_table_query = """
     CREATE TABLE books (
         id              INTEGER     PRIMARY KEY UNIQUE,
         title           VARCHAR     NOT NULL,
@@ -375,10 +368,8 @@ except sqlite3.OperationalError:
         updated_by      VARCHAR,
         UNIQUE(title, author)
     );
-    """
-    conn.execute(create_table)
-    conn.commit()
-
+"""
+create_table("books", create_table_query, conn)
 
 csv_file = "external_data/goodreads_data.csv"
 df = pd.read_csv(csv_file)
