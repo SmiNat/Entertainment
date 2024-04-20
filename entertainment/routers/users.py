@@ -9,7 +9,8 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from entertainment.database import SessionLocal
+# from entertainment.database import SessionLocal
+from entertainment.database import get_db
 from entertainment.enums import UserRole
 from entertainment.exceptions import DatabaseError
 from entertainment.models import Users
@@ -23,12 +24,12 @@ router = APIRouter(prefix="/user", tags=["user"])
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-async def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# async def get_db():
+#     db = SessionLocal()
+#     try:
+#         yield db
+#     finally:
+#         db.close()
 
 
 db_dependency = Annotated[Session, Depends(get_db)]
@@ -72,12 +73,11 @@ class ChangePassword(BaseModel):
 @router.get("/{username}", status_code=status.HTTP_200_OK, response_model=GetUser)
 async def get_user(username: str, db: db_dependency, user: user_dependency):
     requested_user = db.query(Users).filter(Users.username == username).first()
-    if not requested_user:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No user found in the database.")
-
     try:
         authenticated_user = (
             db.query(Users).filter(Users.id == uuid.UUID(user["id"])).first()
+            # db.query(Users).filter(Users.id == str(user["id"])).first()
+            # db.query(Users).filter(Users.id == user["id"]).first()  # ??????????????????
         )
     except TypeError:
         raise HTTPException(
@@ -89,6 +89,9 @@ async def get_user(username: str, db: db_dependency, user: user_dependency):
     if not authenticated_user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Failed Authentication.")
 
+    if not requested_user:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No user found in the database.")
+
     if authenticated_user.role != UserRole.admin:
         if username != user["username"]:
             raise HTTPException(
@@ -99,8 +102,8 @@ async def get_user(username: str, db: db_dependency, user: user_dependency):
     return requested_user
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
-async def create_user(db: db_dependency, new_user: CreateUser) -> None:
+@router.post("/register", status_code=status.HTTP_201_CREATED, response_model=GetUser)
+async def create_user(db: db_dependency, new_user: CreateUser) -> dict:
     if not new_user.password == new_user.confirm_password:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Passwords does not match.")
 
@@ -117,6 +120,7 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> None:
     try:
         db.add(user_model)
         db.commit()
+        db.refresh(user_model)
     except IntegrityError as e:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail=f"{DatabaseError(e._message())}"
@@ -125,10 +129,13 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> None:
     logger.debug(
         "Post on create user - successfully added a user '%s'." % user_model.username
     )
+    return user_model
 
 
 @router.patch("/", status_code=status.HTTP_204_NO_CONTENT)
-async def update_user(db: db_dependency, user: user_dependency, data: UpdateUser):
+async def update_user(
+    db: db_dependency, user: user_dependency, data: UpdateUser
+) -> None:
     authenticated_user = (
         db.query(Users).filter(Users.id == uuid.UUID(user["id"])).first()
     )
@@ -145,7 +152,7 @@ async def update_user(db: db_dependency, user: user_dependency, data: UpdateUser
 
 
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(db: db_dependency, user: user_dependency):
+async def delete_user(db: db_dependency, user: user_dependency) -> None:
     authenticated_user = (
         db.query(Users).filter(Users.id == uuid.UUID(user["id"])).first()
     )
@@ -164,7 +171,7 @@ async def delete_user(db: db_dependency, user: user_dependency):
 @router.put("/password", status_code=status.HTTP_204_NO_CONTENT)
 async def change_password(
     db: db_dependency, user: user_dependency, password: ChangePassword
-):
+) -> None:
     authenticated_user = (
         db.query(Users).filter(Users.id == uuid.UUID(user["id"])).first()
     )

@@ -46,6 +46,7 @@ cover/
 # Database and logs
 *.log
 *.log.*
+logs*
 *.db
 *.db-journal
 None

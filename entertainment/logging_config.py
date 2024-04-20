@@ -1,7 +1,8 @@
 import logging
+import os
 from logging.config import dictConfig
 
-from entertainment.config import DevConfig, config
+from entertainment.config import DevConfig, TestConfig, config
 from entertainment.enums import FontBackground, FontColor, FontReset, FontType
 
 
@@ -86,6 +87,11 @@ def configure_logging() -> None:
                     "datefmt": "%Y-%m-%dT%H:%M:%S",
                     "format": "%(asctime)s %(msecs)03d %(levelname)s %(name)s %(filename)s %(lineno)s %(correlation_id)s %(message)s",
                 },
+                "test": {
+                    "class": "logging.Formatter",
+                    "datefmt": "%Y-%m-%d %H:%M:%S",
+                    "format": "%(asctime)s.%(msecs)03dZ - %(levelname)8s - TEST - %(name)s - %(filename)s:%(lineno)s --- [%(correlation_id)s] %(message)s",
+                },
             },
             "handlers": {
                 "console_libraries": {
@@ -102,9 +108,9 @@ def configure_logging() -> None:
                 },
                 "fixed": {
                     "class": "logging.FileHandler",
-                    "level": "WARNING",
+                    "level": "ERROR",
                     "formatter": "file",
-                    "filename": "logs_warnings.log",
+                    "filename": "logs_error.log",
                     "filters": ["correlation_id"],
                     "encoding": "utf-8",
                 },
@@ -119,11 +125,30 @@ def configure_logging() -> None:
                     "filters": ["correlation_id"],
                     "encoding": "utf-8",
                 },
+                "tests": {
+                    "class": "logging.handlers.RotatingFileHandler",
+                    "level": "DEBUG",
+                    "formatter": "test",
+                    "filename": os.path.join(
+                        os.path.dirname(__file__), "tests", "logs_test.log"
+                    ),
+                    "mode": "a",
+                    "maxBytes": 1024 * 256,  # 0.25MB
+                    "backupCount": 1,
+                    "filters": ["correlation_id"],
+                    "encoding": "utf-8",
+                },
             },
             "loggers": {
                 "entertainment": {
-                    "handlers": ["console_entertainment", "fixed", "rotating"],
-                    "level": "DEBUG" if isinstance(config, DevConfig) else "INFO",
+                    "handlers": [
+                        "console_entertainment",
+                        "tests" if isinstance(config, TestConfig) else "rotating",
+                        "fixed",
+                    ],
+                    "level": "DEBUG"
+                    if isinstance(config, (DevConfig, TestConfig))
+                    else "INFO",
                     "propagade": False,
                 },
                 "uvicorn": {
