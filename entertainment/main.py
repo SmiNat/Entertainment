@@ -1,6 +1,5 @@
 import logging
 import os
-import sqlite3
 import traceback
 from contextlib import asynccontextmanager
 
@@ -8,8 +7,7 @@ from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import FastAPI, HTTPException, Request  # noqa: F401
 from fastapi.exception_handlers import http_exception_handler  # noqa: F401
 
-from entertainment.config import config
-from entertainment.database import Base, engine
+from entertainment.database import create_db_tables, db_initial_data
 from entertainment.logging_config import configure_logging
 from entertainment.routers import auth, movies, users
 
@@ -21,40 +19,12 @@ logger = logging.getLogger(__name__)
 configure_logging()
 
 
-# Creating database tables
-Base.metadata.create_all(bind=engine)
-
-# After creating the database, the app will check if the file with db exists
-# and is populated with data from kaggle.com csv files (our data directory).
-# If there are no records in the database (at the initial setup) the app will run
-# the file csv_converter that converts csv files from our data directory
-# into desired database structure and then it will fill our db file with initial data.
-# Note: we are using config.py file to set the environment we currently work with,
-# so instead of using .env file directly we access our environment variables
-# through the config file. Therefore instead of getting the file path directly
-# from .env file (like: str(os.environ.get("DEV_DATABASE_PATH"))) we use our
-# config file (like: config.DATABASE_PATH).
-
-if os.path.exists(config.DATABASE_PATH):
-    if not (
-        sqlite3.connect(config.DATABASE_PATH)
-        .cursor()
-        .execute("SELECT count(*) FROM movies;")
-        .fetchone()[0]
-    ):
-        logger.info("#️⃣  No initial database content.")
-        logger.info("➡️  Updating a database... (can take a while)")
-        import entertainment.csv_converter as csv_converter  # noqa: F401
-
-        logger.info("✅ Database was successfully updated.")
-    else:
-        logger.debug("✅ Database with kaggle initial data is ready to use.")
-
-
-# Starting the app with logging configuration
+# Starting the app with logging and database configuration
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
+    create_db_tables()
+    db_initial_data()
     yield
 
 

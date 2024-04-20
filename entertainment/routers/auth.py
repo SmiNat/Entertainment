@@ -1,6 +1,6 @@
 import logging
 import os
-import uuid
+import uuid  # noqa
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
@@ -13,12 +13,14 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from starlette import status
 
-from entertainment.database import SessionLocal
+from entertainment.database import get_db
+
+# from entertainment.database import SessionLocal
 from entertainment.models import Users
 
 load_dotenv()
 
-# to silence AttributeError: module 'bcrypt' has no attribute '__about__'
+# To silence AttributeError: module 'bcrypt' has no attribute '__about__'
 # which is not an error, just a warning that passlib attempts to read a version
 # and fails because it's loading modules that no longer exist in bcrypt 4.1.x.
 logging.getLogger("passlib").setLevel(logging.ERROR)
@@ -29,7 +31,7 @@ router = APIRouter(prefix="/auth", tags=["authorization"])
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
 ALGORITHM = os.environ.get("ALGORITHM")
-ACCESS_TOKEN_EXPIRE_MINUTES = 5
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/token")
@@ -40,12 +42,12 @@ class Token(BaseModel):
     token_type: str
 
 
-async def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# async def get_db():
+#     db = SessionLocal()
+#     try:
+#         yield db
+#     finally:
+#         db.close()
 
 
 db_dependency = Annotated[Session, Depends(get_db)]
@@ -66,9 +68,9 @@ def authenticate_user(username: str, password: str, db: Session):
 
 
 def create_access_token(
-    username: str, user_id: uuid, expires_delta: timedelta | None = None
+    username: str, user_id: uuid, role: str, expires_delta: timedelta | None = None
 ):
-    payload_to_encode = {"sub": username, "id": user_id}
+    payload_to_encode = {"sub": username, "id": user_id, "role": role}
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
@@ -85,12 +87,13 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
         payload = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
         username: str = payload.get("sub")
         user_id: uuid = payload.get("id")
+        user_role: str = payload.get("role")
         if not username or not user_id:
             return HTTPException(
                 status.HTTP_401_UNAUTHORIZED, "Could not validate credentials."
             )
         logger.debug("Current user: '%s'." % username)
-        return {"username": username, "id": user_id}
+        return {"username": username, "id": user_id, "role": user_role}
     except JWTError:
         return HTTPException(
             status.HTTP_401_UNAUTHORIZED, "Could not validate credentials."
@@ -104,7 +107,11 @@ async def login_for_access_token(
 ) -> dict[str, str]:
     user = authenticate_user(form_data.username, form_data.password, db)
     token = create_access_token(
-        user.username, str(user.id), timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        user.username,
+        str(user.id),
+        # user.id,
+        user.role,
+        timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 
     logger.debug("Access token returned for the user '%s'." % user.username)
