@@ -1,7 +1,5 @@
 import datetime
 import logging
-
-# import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -10,7 +8,6 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-# from entertainment.database import SessionLocal
 from entertainment.database import get_db
 from entertainment.enums import UserRole
 from entertainment.exceptions import DatabaseError
@@ -23,14 +20,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/user", tags=["user"])
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-# async def get_db():
-#     db = SessionLocal()
-#     try:
-#         yield db
-#     finally:
-#         db.close()
 
 
 db_dependency = Annotated[Session, Depends(get_db)]
@@ -50,7 +39,6 @@ class CreateUser(User):
 
 
 class GetUser(User):
-    # id: uuid.UUID
     id: int
     role: str
     is_active: bool
@@ -79,33 +67,11 @@ async def get_user(username: str, db: db_dependency, user: user_dependency):
     logger.debug("Requested user at get_user endpoint: %s" % username)
     logger.debug("Authenticated user at get_user endpoint: %s" % user["username"])
 
-    # try:
-    #     authenticated_user = (
-    #         # db.query(Users).filter(Users.id == uuid.UUID(user["id"])).first()
-    #         db.query(Users).filter(Users.id == user["id"]).first()
-    #         # db.query(Users).filter(Users.id == str(user["id"])).first()
-    #     )
-    #     # print(">>>>>>>>>>>>>>>>>>>>>> au:", authenticated_user)
-    #     # print(">>>>>>>>>>>>>>>>>>>>>> au:", authenticated_user.username)
-    #     # print(">>>>>>>>>>>>>>>>>>>>>> au:", authenticated_user.id)
-    #     # print(">>>>>>>>>>>>>>>>>>>>>> au:", authenticated_user.role)
-    # except TypeError:
-    #     raise HTTPException(
-    #         status.HTTP_401_UNAUTHORIZED,
-    #         "Cannot validate authenicated user. Check if "
-    #         "the session has not expired and the token is still valid.",
-    #     )
-
-    # if not authenticated_user:
-    # if not user:
-    #     raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Failed Authentication.")
-
     if not requested_user:
         raise HTTPException(
             status.HTTP_404_NOT_FOUND, "User %s not found in the database." % username
         )
 
-    # if authenticated_user.role != UserRole.admin:
     if user["role"] != UserRole.admin:
         if username != user["username"]:
             raise HTTPException(
@@ -122,7 +88,6 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> dict:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Passwords does not match.")
 
     user_model = Users(
-        # id=uuid.uuid4(),
         username=new_user.username,
         email=new_user.email,
         first_name=new_user.first_name,
@@ -150,10 +115,7 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> dict:
 async def update_user(
     db: db_dependency, user: user_dependency, data: UpdateUser
 ) -> None:
-    authenticated_user = (
-        # db.query(Users).filter(Users.id == uuid.UUID(user["id"])).first()
-        db.query(Users).filter(Users.id == user["id"]).first()
-    )
+    authenticated_user = db.query(Users).filter(Users.id == user["id"]).first()
 
     for field, value in data.model_dump(exclude_unset=True, exclude_none=True).items():
         setattr(authenticated_user, field, value)
@@ -168,15 +130,11 @@ async def update_user(
 
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(db: db_dependency, user: user_dependency) -> None:
-    authenticated_user = (
-        # db.query(Users).filter(Users.id == uuid.UUID(user["id"])).first()
-        db.query(Users).filter(Users.id == user["id"]).first()
-    )
+    authenticated_user = db.query(Users).filter(Users.id == user["id"]).first()
 
     if not authenticated_user:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No user found in the database.")
 
-    # db.query(Users).filter(Users.id == uuid.UUID(user["id"])).delete()
     db.query(Users).filter(Users.id == user["id"]).delete()
     db.commit()
 
@@ -189,10 +147,7 @@ async def delete_user(db: db_dependency, user: user_dependency) -> None:
 async def change_password(
     db: db_dependency, user: user_dependency, password: ChangePassword
 ) -> None:
-    authenticated_user = (
-        # db.query(Users).filter(Users.id == uuid.UUID(user["id"])).first()
-        db.query(Users).filter(Users.id == user["id"]).first()
-    )
+    authenticated_user = db.query(Users).filter(Users.id == user["id"]).first()
 
     if not bcrypt_context.verify(
         password.current_password.strip(), authenticated_user.hashed_password

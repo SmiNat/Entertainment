@@ -1,7 +1,5 @@
 import logging
 import os
-
-# import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
@@ -14,7 +12,6 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from starlette import status
 
-# from entertainment.database import SessionLocal
 from entertainment.database import get_db
 from entertainment.models import Users
 
@@ -42,14 +39,6 @@ class Token(BaseModel):
     token_type: str
 
 
-# async def get_db():
-#     db = SessionLocal()
-#     try:
-#         yield db
-#     finally:
-#         db.close()
-
-
 db_dependency = Annotated[Session, Depends(get_db)]
 
 
@@ -68,7 +57,6 @@ def authenticate_user(username: str, password: str, db: Session):
 
 
 def create_access_token(
-    # username: str, user_id: uuid, role: str, expires_delta: timedelta | None = None
     username: str,
     user_id: int,
     role: str,
@@ -90,7 +78,6 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
         username: str = payload.get("sub")
-        # user_id: uuid = payload.get("id")
         user_id: int = payload.get("id")
         user_role: str = payload.get("role")
         if not username or not user_id:

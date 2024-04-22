@@ -14,33 +14,6 @@ import logging  # noqa
 logger = logging.getLogger(__name__)
 
 
-# test_db = "./tests/test.db"
-
-# create_db(test_db)
-
-# SQLALCHEMY_TEST_DATABASE_URL = "sqlite://"
-# SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///./tests/test.db"
-
-# engine = create_sqlite_engine(SQLALCHEMY_TEST_DATABASE_URL)
-
-# TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Base.metadata.create_all(bind=engine)
-
-
-# def override_get_db():
-#     try:
-#         db = TestingSessionLocal()
-#         yield db
-#     finally:
-#         db.close()
-
-
-# app.dependency_overrides[get_db] = override_get_db
-
-# client = TestClient(app)
-
-
 @pytest.mark.asyncio
 async def test_create_user_201(client):
     """Test creating a new user is successfull."""

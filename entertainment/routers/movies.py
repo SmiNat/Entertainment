@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql._typing import _TP
 from starlette import status
 
-# from entertainment.database import SessionLocal
 from entertainment.database import get_db
 from entertainment.models import Movies
 
@@ -20,14 +19,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(
     prefix="/movies", tags=["movies"], responses={404: {"description": "Not found."}}
 )
-
-
-# async def get_db():
-#     db = SessionLocal()
-#     try:
-#         yield db
-#     finally:
-#         db.close()
 
 
 db_dependency = Annotated[Session, Depends(get_db)]
