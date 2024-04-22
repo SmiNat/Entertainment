@@ -37,8 +37,11 @@ def override_get_db():
     try:
         yield db
     finally:
+        # for table in reversed(Base.metadata.sorted_tables):
+        #     db.execute(table.delete())
         db.execute(text("DELETE FROM users"))
         db.execute(text("DELETE FROM movies"))
+        # db.
         db.commit()
         db.close()
 

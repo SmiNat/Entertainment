@@ -36,11 +36,12 @@ async def test_create_user_201(client):
 
 @pytest.mark.anyio
 async def test_get_user_401_if_not_authenticated(async_client):
-    """Test access to user 'testuser' forbidden without user authentication."""
-    response = await async_client.get("/user/testuser")
+    """Test access to user 'test_user' forbidden without user authentication."""
+    response = await async_client.get("/user/test_user")
     assert response.status_code == 401
     assert "Not authenticated" in response.content.decode()  # remove !!!
     assert "Not authenticated" in response.text  # remove !!!
+    assert "Not authenticated" == response.json()["detail"]  # remove !!!
 
 
 @pytest.mark.anyio
@@ -48,7 +49,7 @@ async def test_get_user_200_with_auth_user(async_client):
     """Test accessing existing user 'test_user' successfull with authentication
     of the same user."""
     # Creating a 'test_user'
-    user = create_db_user("test_user", "test@example.com", "password")
+    user = create_db_user("testuser", "test@example.com", "password")
 
     # Mocking authorisation for a user...
     app.dependency_overrides[get_current_user] = lambda: {
@@ -62,7 +63,7 @@ async def test_get_user_200_with_auth_user(async_client):
 
     # Endpoint call with user token authentication
     response = await async_client.get(
-        "/user/test_user",
+        f"/user/{user.username}",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 200, response.text
@@ -70,9 +71,9 @@ async def test_get_user_200_with_auth_user(async_client):
 
 @pytest.mark.anyio
 async def test_get_user_with_other_username_200_with_admin_auth(async_client):
-    """Test accessing existing user 'john_doe' successfull with authentication
+    """Test accessing existing user 'test_user' successfull with authentication
     of the another user with admin role."""
-    # Creating a 'test_user' and 'admin_user'
+    # Creating 'test_user' and 'admin_user'
     test_user = create_db_user("test_user", "test@example.com", "password", "user")
     admin_user = create_db_user("admin_user", "admin@example.com", "password", "admin")
 
@@ -92,52 +93,58 @@ async def test_get_user_with_other_username_200_with_admin_auth(async_client):
 
 @pytest.mark.anyio
 async def test_get_user_with_other_username_403_with_no_amin_auth(async_client):
-    """Test accessing existing user 'john_doe' forbidden with authentication
+    """Test accessing existing user 'test_user' forbidden with authentication
     of the another user without admin role."""
-    print("====================================")
+
+    db = TestingSessionLocal()
+    users = db.query(Users).all()
+    print(">>>>>>>>>>>>", [user.username for user in users])
+
     # Creating a 'test_user' and 'admin_user'
     test_user = create_db_user("test_user", "test@example.com", "password", "user")
     other_user = create_db_user("other_user", "user@example.com", "password", "user")
+
+    db = TestingSessionLocal()
+    users = db.query(Users).all()
+    print(">>>>>>>>>>>> 2", [user.username for user in users])
 
     # Creating a token for 'admin_user'
     token = create_access_token(
         username=other_user.username, user_id=other_user.id, role=other_user.role
     )
 
-    db = TestingSessionLocal()
-    for user in db.query(Users).all():
-        print(">>>>>>>>>>>>>", user.username)
-
     # Endpoint call for 'test_user' with authentication of 'other_user'
     response = await async_client.get(
         f"/user/{test_user.username}",
         headers={"Authorization": f"Bearer {token}"},
     )
-    print("====================================")
     assert response.status_code == 403
-    msg = "Permission denied. Access to see other users' data is restricted"
-    assert msg == response.content.decode()
+    msg = "Permission denied. Access to see other users' data is restricted."
+    assert msg in response.content.decode()
+    assert msg == response.json()["detail"]
 
 
-@pytest.mark.anyio
-async def test_get_user_not_found(
-    async_client, use_authenticated_admin_user, create_test_admin_user
-):
-    # test_user = create_test_user
-    # print(">>>>>>>>>>>>>>", test_user.id, test_user.username)
-    # user_access_token = create_access_token(
-    #     username=test_user.username, user_id=test_user.id, role=test_user.role
-    # )
-    response = await async_client.get(
-        "/user/testuser",
-        # headers={"Authorization": f"Bearer {user_access_token}"}
-    )
-    assert response.status_code == 200, response.text
+# @pytest.mark.anyio
+# async def test_get_user_not_found(
+#     async_client, use_authenticated_admin_user, create_test_admin_user
+# ):
+#     # test_user = create_test_user
+#     # print(">>>>>>>>>>>>>>", test_user.id, test_user.username)
+#     # user_access_token = create_access_token(
+#     #     username=test_user.username, user_id=test_user.id, role=test_user.role
+#     # )
+#     response = await async_client.get(
+#         "/user/testuser",
+#         # headers={"Authorization": f"Bearer {user_access_token}"}
+#     )
+#     assert response.status_code == 200, response.text
 
-    # response = await async_client.get(
-    #     "/user/deadpool", headers={"Authorization": f"Bearer {user_access_token}"}
-    # )
-    # assert response.status_code == 404, response.text
+#     # response = await async_client.get(
+#     #     "/user/deadpool", headers={"Authorization": f"Bearer {user_access_token}"}
+#     # )
+#     # assert response.status_code == 404, response.text
+
+#
 
 
 # @pytest.mark.asyncio

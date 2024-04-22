@@ -63,13 +63,15 @@ def create_access_token(
     expires_delta: timedelta | None = None,
 ):
     payload_to_encode = {"sub": username, "id": user_id, "role": role}
+    logger.debug("Payload for create_access_token: %s" % payload_to_encode)
+
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     payload_to_encode.update({"exp": expire})
 
-    logger.debug("Access token created for the user '%s'." % username)
+    logger.debug("Access token created for the user: '%s'." % username)
 
     return jwt.encode(payload_to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -105,6 +107,6 @@ async def login_for_access_token(
         timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 
-    logger.debug("Access token returned for the user '%s'." % user.username)
+    logger.debug("Access token returned for the user: '%s'." % user.username)
 
     return {"access_token": token, "token_type": "bearer"}

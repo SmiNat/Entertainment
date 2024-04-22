@@ -66,6 +66,7 @@ async def get_user(username: str, db: db_dependency, user: user_dependency):
 
     logger.debug("Requested user at get_user endpoint: %s" % username)
     logger.debug("Authenticated user at get_user endpoint: %s" % user["username"])
+    logger.debug("Token used for get_user endpoint: %s" % user["username"])
 
     if not requested_user:
         raise HTTPException(
