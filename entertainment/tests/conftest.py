@@ -35,7 +35,7 @@ Base.metadata.drop_all(bind=engine)
 Base.metadata.create_all(bind=engine)
 
 
-# Overriding database connection for the endpoins
+# Overriding database connection for all of the endpoins
 def override_get_db():
     """Sets a clean db session for each test."""
     db = TestingSessionLocal()
@@ -60,12 +60,15 @@ app.dependency_overrides[get_db] = override_get_db
 #     db.close()
 
 
-def override_get_current_user():
-    # return {"username": "testuser", "id": str(uuid.uuid4()), "role": "admin"}
-    return {"username": "testuser", "id": 1, "role": "admin"}
+# # Overriding logged in user for tests with authentication required
+# def override_get_current_user():
+#     # return {"username": "testuser", "id": str(uuid.uuid4()), "role": "admin"}
+#     return {"username": "testuser", "id": 1, "role": "admin"}
 
 
-app.dependency_overrides[get_current_user] = override_get_current_user
+# @pytest.fixture
+# def use_authenticated_admin_user():
+#     app.dependency_overrides[get_current_user] = override_get_current_user
 
 
 # Overriding fixture pytest.mark.anyio to test async functions
@@ -91,6 +94,56 @@ async def async_client(client) -> AsyncGenerator:
     """Uses async client from httpx instead of test client from fastapi for async tests."""
     async with AsyncClient(app=app, base_url=client.base_url) as ac:
         yield ac
+
+
+# @pytest.fixture
+def create_db_user(
+    username,
+    email,
+    hashed_password,
+    role="user",
+    is_active=True,
+    first_name=None,
+    last_name=None,
+):
+    db = TestingSessionLocal()
+    try:
+        new_user = Users(
+            username=username,
+            email=email,
+            hashed_password=hashed_password,
+            role=role,
+            is_active=is_active,
+            first_name=first_name,
+            last_name=last_name,
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        return new_user
+    finally:
+        db.close()
+
+
+# @pytest.fixture
+# def create_test_admin_user():
+#     test_user = create_db_user(
+#         username="testuser",
+#         email="test@example.com",
+#         role="admin",
+#         hashed_password="testpass123",
+#     )
+#     return test_user
+
+
+# @pytest.fixture
+# def create_test_user():
+#     test_user = create_db_user(
+#         username="testuser",
+#         email="test@example.com",
+#         hashed_password="testpass123",
+#     )
+#     return test_user
 
 
 # @pytest.fixture

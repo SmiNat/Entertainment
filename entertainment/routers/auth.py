@@ -1,6 +1,7 @@
 import logging
 import os
-import uuid
+
+# import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
@@ -67,7 +68,11 @@ def authenticate_user(username: str, password: str, db: Session):
 
 
 def create_access_token(
-    username: str, user_id: uuid, role: str, expires_delta: timedelta | None = None
+    # username: str, user_id: uuid, role: str, expires_delta: timedelta | None = None
+    username: str,
+    user_id: int,
+    role: str,
+    expires_delta: timedelta | None = None,
 ):
     payload_to_encode = {"sub": username, "id": user_id, "role": role}
     if expires_delta:
@@ -85,7 +90,8 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
         username: str = payload.get("sub")
-        user_id: uuid = payload.get("id")
+        # user_id: uuid = payload.get("id")
+        user_id: int = payload.get("id")
         user_role: str = payload.get("role")
         if not username or not user_id:
             return HTTPException(

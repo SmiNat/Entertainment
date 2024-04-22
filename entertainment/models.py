@@ -1,7 +1,7 @@
 import datetime
 
 from sqlalchemy import (
-    UUID,
+    # UUID,
     Boolean,
     Column,
     Date,
@@ -21,12 +21,13 @@ from entertainment.database import Base
 class Users(Base):
     __tablename__ = "users"
 
-    id = Column(UUID, primary_key=True, index=True, unique=True)
+    # id = Column(UUID, primary_key=True, index=True, unique=True)
+    id = Column(Integer, primary_key=True, index=True, unique=True)
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     first_name = Column(String, nullable=True)
     last_name = Column(String, nullable=True)
-    hashed_password = Column(String, unique=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
     role = Column(String, default="user")
     is_active = Column(Boolean, default=True)
     create_timestamp = Column(DateTime, default=datetime.datetime.now())
@@ -48,7 +49,8 @@ class UserData(Base):
     update_timestamp = Column(
         DateTime, default=datetime.datetime.now(), onupdate=datetime.datetime.now()
     )
-    user_id = Column(UUID, ForeignKey("users.id"))
+    # user_id = Column(UUID, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
     movie_id = Column(Integer, ForeignKey("movies.id"))
     book_id = Column(Integer, ForeignKey("books.id"))
     song_id = Column(Integer, ForeignKey("songs.id"))
