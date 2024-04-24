@@ -29,8 +29,8 @@ user_dependency = Annotated[dict, Depends(get_current_user)]
 class User(BaseModel):
     username: str = Field(min_length=5)
     email: EmailStr
-    first_name: str | None = Field(min_length=2, examples=[None])
-    last_name: str | None = Field(min_length=2, examples=[None])
+    first_name: str | None = Field(default=None, min_length=2, examples=[None])
+    last_name: str | None = Field(default=None, min_length=2, examples=[None])
 
 
 class CreateUser(User):
@@ -60,21 +60,31 @@ class ChangePassword(BaseModel):
     confirm_password: str = Field(min_length=8, format="password")
 
 
+@router.get("/")
+# async def get_logged_in_user(current_user: User = Depends(get_current_user)):
+async def get_logged_in_user(current_user: user_dependency):
+    return current_user
+
+
 @router.get("/{username}", status_code=status.HTTP_200_OK, response_model=GetUser)
 async def get_user(username: str, db: db_dependency, user: user_dependency):
     requested_user = db.query(Users).filter(Users.username == username).first()
 
     logger.debug("Requested user at get_user endpoint: %s" % username)
     logger.debug("Authenticated user at get_user endpoint: %s" % user["username"])
-    logger.debug("Token used for get_user endpoint: %s" % user["username"])
 
     if not requested_user:
         raise HTTPException(
-            status.HTTP_404_NOT_FOUND, "User %s not found in the database." % username
+            status.HTTP_404_NOT_FOUND, "User '%s' not found in the database." % username
         )
 
-    if user["role"] != UserRole.admin:
+    if user["role"] != UserRole.ADMIN:
         if username != user["username"]:
+            logger.debug(
+                "Searched username '%s' does not match with authenticated user '%s'."
+                % (username, user["username"])
+            )
+
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN,
                 "Permission denied. Access to see other users' data is restricted.",
@@ -85,6 +95,11 @@ async def get_user(username: str, db: db_dependency, user: user_dependency):
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=GetUser)
 async def create_user(db: db_dependency, new_user: CreateUser) -> dict:
+    if db.query(Users).filter(Users.email == new_user.email).first():
+        raise HTTPException(400, "A user with that email already exists.")
+    if db.query(Users).filter(Users.username == new_user.username).first():
+        raise HTTPException(400, "A user with that username already exists.")
+
     if not new_user.password == new_user.confirm_password:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Passwords does not match.")
 
@@ -94,7 +109,7 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> dict:
         first_name=new_user.first_name,
         last_name=new_user.last_name,
         hashed_password=bcrypt_context.hash(new_user.password.strip()),
-        role=UserRole.user,  # for security reasons, all users created via API has 'user' role
+        role=UserRole.USER,  # for security reasons, all users created via API has 'user' role
     )
 
     try:

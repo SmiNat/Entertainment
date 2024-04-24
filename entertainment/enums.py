@@ -2,43 +2,47 @@ from enum import Enum
 
 
 class UserRole(str, Enum):
-    admin = "admin"
-    user = "user"
+    ADMIN = "admin"
+    USER = "user"
+
+
+class TokenExp(int, Enum):
+    ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 
 class FontColor(str, Enum):
-    blue = "\033[94m"
-    green = "\033[92m"
-    light_blue_cyan = "\033[96m"
-    purple_magneta = "\033[95m"
-    red = "\033[91m"
-    yellow = "\033[93m"
-    white = "\033[97m"
-    default = "\033[39m"
+    BLUE = "\033[94m"
+    GREEN = "\033[92m"
+    LIGTH_BLUE_CYAN = "\033[96m"
+    PURPLE_MAGNETA = "\033[95m"
+    RED = "\033[91m"
+    YELLOW = "\033[93m"
+    WHITE = "\033[97m"
+    DEFAULT = "\033[39m"
 
 
 class FontBackground(str, Enum):
-    black = "\033[40m"
-    blue = "\033[43m"
-    green = "\033[42m"
-    light_blue_cyan = "\033[46m"
-    purple_magneta = "\033[45m"
-    red = "\033[41m"
-    yellow = "\033[43m"
-    white = "\033[47m"
-    default = "\033[49m"
+    BLACK = "\033[40m"
+    BLUE = "\033[43m"
+    GREEN = "\033[42m"
+    LIGTH_BLUE_CYAN = "\033[46m"
+    PURPLE_MAGNETA = "\033[45m"
+    RED = "\033[41m"
+    YELLOW = "\033[43m"
+    WHITE = "\033[47m"
+    DEFAULT = "\033[49m"
 
 
 class FontType(str, Enum):
-    bold = "\033[1m"
-    faint = "\033[2m"
-    italics = "\033[3m"
-    underline = "\033[4m"
-    conceal = "\033[8m"
-    crossed_out = "\033[9m"
-    bold_off = "\033[22m"
-    default = ""
+    BOLD = "\033[1m"
+    FAINT = "\033[2m"
+    ITALICS = "\033[3m"
+    UNDERLINE = "\033[4m"
+    CONCEAL = "\033[8m"
+    CROSSED_OUT = "\033[9m"
+    BOLD_OFF = "\033[22m"
+    DEFAULT = ""
 
 
 class FontReset(str, Enum):
-    suffix = "\033[0m"
+    SUFFIX = "\033[0m"

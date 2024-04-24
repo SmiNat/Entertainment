@@ -1,36 +1,43 @@
+import logging
 import os
 from typing import AsyncGenerator, Generator
 
 import pytest
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy import MetaData, create_engine, text  # noqa
+from sqlalchemy.orm import declarative_base, sessionmaker  # noqa
 
 os.environ["ENV_STATE"] = "test"
 
-from entertainment.config import config  # noqa
+from entertainment.config import config  # noqa: E402
 from entertainment.database import Base, get_db  # noqa
-from entertainment.main import app  # noqa
-from entertainment.models import Users, Movies  # noqa
+from entertainment.exceptions import DatabaseNotEmptyError  # noqa: E402
+from entertainment.main import app  # noqa: E402
+from entertainment.models import Movies, Users  # noqa
+from entertainment.routers.auth import (  # noqa: E402
+    create_access_token,
+    get_current_user,
+)
 
+logger = logging.getLogger(__name__)
 
 # Creating test.db instead of using application db (entertainment.db)
 engine = create_engine(
     config.DATABASE_URL,  # test.db
     connect_args={"check_same_thread": False},
     echo=False,
-    poolclass=StaticPool,
+    # poolclass=StaticPool,
 )
-
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base.metadata.drop_all(bind=engine)
 Base.metadata.create_all(bind=engine)
 
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 # Overriding database connection for all of the endpoins
+# @pytest.fixture
 def override_get_db():
     """Sets a clean db session for each test."""
     db = TestingSessionLocal()
@@ -39,14 +46,33 @@ def override_get_db():
     finally:
         # for table in reversed(Base.metadata.sorted_tables):
         #     db.execute(table.delete())
-        db.execute(text("DELETE FROM users"))
-        db.execute(text("DELETE FROM movies"))
-        # db.
-        db.commit()
+        # db.execute(text("DELETE FROM users"))
+        # db.commit()
         db.close()
 
 
 app.dependency_overrides[get_db] = override_get_db
+
+
+# @pytest.fixture
+# def delete_db():
+#     """Removes the test.db file."""
+#     os.remove(
+#         os.path.join(os.path.dirname(os.path.abspath(__file__)), config.DATABASE_PATH)
+#     )
+
+
+@pytest.fixture(autouse=True, scope="function")
+def clean_db():
+    """Cleans db session for each test."""
+    db = TestingSessionLocal()
+    db.execute(text("DELETE FROM users"))
+    db.commit()
+    db.close()
+    # Base.metadata.drop_all(
+    #     bind=engine
+    # )  # Base.metadata.drop_all(bind=engine, tables=[Users.__table__], checkfirst=True)
+    # Base.metadata.create_all(bind=engine)
 
 
 # Overriding fixture pytest.mark.anyio to test async functions
@@ -74,15 +100,14 @@ async def async_client(client) -> AsyncGenerator:
         yield ac
 
 
-# @pytest.fixture
 def create_db_user(
-    username,
-    email,
-    hashed_password,
-    role="user",
-    is_active=True,
-    first_name=None,
-    last_name=None,
+    username: str,
+    email: str,
+    hashed_password: str,
+    role: str = "user",
+    is_active: bool = True,
+    first_name: str | None = None,
+    last_name: str | None = None,
 ):
     db = TestingSessionLocal()
     try:
@@ -100,4 +125,118 @@ def create_db_user(
         db.refresh(new_user)
         return new_user
     finally:
+        # db.reset()
         db.close()
+
+
+def mock_authorisation(
+    user: Users | dict = None, username: str = None, id: int = None, role: str = "user"
+):
+    if isinstance(user, Users):
+        app.dependency_overrides[get_current_user] = lambda: {
+            "username": user.username,
+            "id": user.id,
+            "role": user.role,
+        }
+    elif isinstance(user, dict):
+        app.dependency_overrides[get_current_user] = lambda: {
+            "username": user["username"],
+            "id": user["id"],
+            "role": user["role"],
+        }
+    elif user and not isinstance(user, (Users, dict)):
+        raise AttributeError(
+            "'user' parameter must be of Users instance or a dictionary, not {}.".format(
+                type(user)
+            )
+        )
+    if not user:
+        if not username or not id:
+            raise AttributeError(
+                "Either 'user' parameter is required or parameters: 'username' and 'id'."
+            )
+        app.dependency_overrides[get_current_user] = lambda: {
+            "username": username,
+            "id": id,
+            "role": role,
+        }
+
+
+# @pytest.fixture
+def check_if_db_users_table_is_empty():
+    db = TestingSessionLocal()
+    db_content = db.query(Users).all()
+    if db_content:
+        logger.warning(
+            "Database warning: not empty Users table; %s"
+            % [
+                {"username": element.username, "id": element.id, "role": element.role}
+                for element in db_content
+            ]
+        )
+        raise DatabaseNotEmptyError("Users table not empty.")
+
+
+def create_user_token(username: str, email: str, password: str, role: str = "user"):
+    user = create_db_user(username, email, password, role)
+    mock_authorisation(user)
+    token = create_access_token(user.username, user.id, user.role)
+    return token
+
+
+# Creating app fixtures
+@pytest.fixture
+async def created_user(async_client: AsyncClient) -> dict:
+    payload = {
+        "username": "testuser",
+        "email": "test@example.com",
+        # "first_name": None,
+        # "last_name": None,
+        # "role": "user",
+        "password": "testpass123",
+        "confirm_password": "testpass123",
+    }
+    user = await async_client.post("/user/register", json=payload)
+    # user = async_client.post("/user", params="testuser")
+    return user.json()
+    # albo:
+    # query = TestingSessionLocal().query(Users).filter(Users.email == payload["email"]).first()
+    # payload["id"] = query.id
+    # return payload
+
+
+@pytest.fixture
+async def created_user_token(async_client, created_user) -> dict:
+    user = created_user
+    token = create_access_token(
+        username=user["username"],
+        user_id=user["id"],
+        role=user["role"],
+    )
+    return token
+
+
+@pytest.fixture(scope="module")
+def test_user():
+    return {
+        "username": "testuser",
+        "password": "testpass123",
+    }
+
+
+def test_login(client, test_user):
+    response = client.post("/token", data=test_user)
+    assert response.status_code == 200
+    token = response.json()["access_token"]
+    assert token is not None
+    return token
+
+
+# @pytest.fixture()
+# async def create_db_records(async_client: AsyncClient):
+#     movie = {
+#         "title": "Test movie",
+#         "premiere": "2024-1-1",
+#         "score": 9,
+#         "genres": ["action", "drama"],
+#     }

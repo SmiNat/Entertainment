@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from starlette import status
 
 from entertainment.database import get_db
+from entertainment.enums import TokenExp
 from entertainment.models import Users
 
 load_dotenv()
@@ -28,7 +29,6 @@ router = APIRouter(prefix="/auth", tags=["authorization"])
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
 ALGORITHM = os.environ.get("ALGORITHM")
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/token")
@@ -68,7 +68,9 @@ def create_access_token(
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+        expire = datetime.now(timezone.utc) + timedelta(
+            minutes=TokenExp.ACCESS_TOKEN_EXPIRE_MINUTES
+        )
     payload_to_encode.update({"exp": expire})
 
     logger.debug("Access token created for the user: '%s'." % username)
@@ -104,7 +106,7 @@ async def login_for_access_token(
         user.username,
         str(user.id),
         user.role,
-        timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+        timedelta(minutes=TokenExp.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 
     logger.debug("Access token returned for the user: '%s'." % user.username)

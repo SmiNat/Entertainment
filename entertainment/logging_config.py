@@ -8,20 +8,20 @@ from entertainment.enums import FontBackground, FontColor, FontReset, FontType
 
 class ColoredFormatter(logging.Formatter):
     MAPPING = {
-        "DEBUG": FontColor.white,
-        "INFO": FontColor.light_blue_cyan,
-        "WARNING": FontColor.yellow,
-        "ERROR": FontColor.red,
-        "CRITICAL": FontBackground.red,
+        "DEBUG": FontColor.WHITE,
+        "INFO": FontColor.LIGTH_BLUE_CYAN,
+        "WARNING": FontColor.YELLOW,
+        "ERROR": FontColor.RED,
+        "CRITICAL": FontBackground.RED,
     }
 
     def __init__(
         self,
         custom_format=None,
-        name_color=FontColor.default,
-        name_font_type=FontType.default,
-        message_color=FontColor.default,
-        message_font_type=FontType.default,
+        name_color=FontColor.DEFAULT,
+        name_font_type=FontType.DEFAULT,
+        message_color=FontColor.DEFAULT,
+        message_font_type=FontType.DEFAULT,
         *args,
         **kwargs,
     ):
@@ -32,11 +32,11 @@ class ColoredFormatter(logging.Formatter):
             self.desired_format = (
                 "%(asctime)s.%(msecs)03dZ - "
                 "%(levelname)-8s - "
-                f"{name_color}{name_font_type}%(name)s{FontReset.suffix} - "
+                f"{name_color}{name_font_type}%(name)s{FontReset.SUFFIX} - "
                 "%(filename)s:%(lineno)s - %(funcName)s"
-                f"{FontColor.yellow} >>> {FontReset.suffix} "
+                f"{FontColor.YELLOW} >>> {FontReset.SUFFIX} "
                 f"[%(correlation_id)s] "
-                f"{message_color}{message_font_type}%(message)s{FontReset.suffix}"
+                f"{message_color}{message_font_type}%(message)s{FontReset.SUFFIX}"
             )
         else:
             self.desired_format = custom_format
@@ -50,8 +50,8 @@ class ColoredFormatter(logging.Formatter):
             record.msg += f"\nAdditional information: {extra_info}"
 
         # Changing levelname color depending on logger actual level
-        color = self.MAPPING.get(record.levelname, FontColor.default)
-        record.levelname = f"{color}{record.levelname:<8}{FontReset.suffix}"
+        color = self.MAPPING.get(record.levelname, FontColor.DEFAULT)
+        record.levelname = f"{color}{record.levelname:<8}{FontReset.SUFFIX}"
 
         # Formatting the record using desired_format
         self._style._fmt = self.desired_format
@@ -74,13 +74,13 @@ def configure_logging() -> None:
             "formatters": {
                 "libraries": {
                     "()": ColoredFormatter,
-                    "name_color": FontColor.green,
-                    "name_font_type": FontType.faint,
+                    "name_color": FontColor.GREEN,
+                    "name_font_type": FontType.FAINT,
                 },
                 "app": {
                     "()": ColoredFormatter,
-                    "name_color": FontColor.green,
-                    "message_color": FontColor.green,
+                    "name_color": FontColor.GREEN,
+                    "message_color": FontColor.GREEN,
                 },
                 "file": {
                     "class": "pythonjsonlogger.jsonlogger.JsonFormatter",  # noqa: E501 >> logging.Formatter

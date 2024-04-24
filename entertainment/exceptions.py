@@ -6,3 +6,7 @@ class DatabaseError(Exception):
 
     def __str__(self) -> str:
         return str(self.message)
+
+
+class DatabaseNotEmptyError(Exception):
+    """Exception raised when the database table is not empty."""
