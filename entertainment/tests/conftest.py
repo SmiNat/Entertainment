@@ -86,9 +86,9 @@ async def async_client(client) -> AsyncGenerator:
 
 # Some helpful functions to use in tests
 def create_db_user(
-    username: str,
-    email: str,
-    hashed_password: str,
+    username: str = "testuser",
+    email: str = "test@example.com",
+    hashed_password: str = "password",
     role: str = "user",
     is_active: bool = True,
     first_name: str | None = None,
@@ -169,6 +169,27 @@ def create_user_token(username: str, email: str, password: str, role: str = "use
 
 # Some app fixtures to use in tests
 @pytest.fixture
+def created_user():
+    db = TestingSessionLocal()
+    try:
+        new_user = Users(
+            username="testuser",
+            email="test@example.com",
+            hashed_password="password",
+            role="user",
+            is_active=True,
+            first_name=None,
+            last_name=None,
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        return new_user
+    finally:
+        db.close()
+
+
+@pytest.fixture
 async def registered_user(async_client: AsyncClient) -> dict:
     payload = {
         "username": "testuser",
@@ -185,7 +206,7 @@ async def registered_user(async_client: AsyncClient) -> dict:
 
 
 @pytest.fixture
-async def created_user_token(async_client, registered_user) -> dict:
+async def created_user_token(async_client, registered_user) -> str:
     user = registered_user
     token = create_access_token(
         username=user["username"],

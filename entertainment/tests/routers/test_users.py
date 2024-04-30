@@ -56,6 +56,76 @@ async def test_create_user_201_with_fixture(registered_user: dict):
 
 
 @pytest.mark.anyio
+async def test_create_user_400_with_not_unique_username(
+    async_client: AsyncClient, created_user
+):
+    """Test creating a new user rejected if username already taken."""
+    user_in_db = created_user
+    request_data = {
+        "username": user_in_db.username,
+        "email": "deadpool@example.com",
+        "password": "deadpool123",
+        "confirm_password": "deadpool123",
+    }
+    response = await async_client.post("/user/register", json=request_data)
+
+    assert response.status_code == 400
+    assert "A user with that username already exists" in response.json()["detail"]
+
+
+@pytest.mark.anyio
+async def test_create_user_400_with_not_unique_email(
+    async_client: AsyncClient, created_user
+):
+    """Test creating a new user rejected if email is already taken."""
+    user_in_db = created_user
+    request_data = {
+        "username": "deadpool",
+        "email": user_in_db.email,
+        "password": "deadpool123",
+        "confirm_password": "deadpool123",
+    }
+    response = await async_client.post("/user/register", json=request_data)
+
+    assert response.status_code == 400
+    assert "A user with that email already exists" in response.json()["detail"]
+
+
+@pytest.mark.anyio
+async def test_create_user_400_with_incorrect_password(async_client: AsyncClient):
+    """Test creating a new user rejected passwords does not match."""
+    request_data = {
+        "username": "deadpool",
+        "email": "deadpool@example.com",
+        "password": "deadpool123",
+        "confirm_password": "wrongstring",
+    }
+    response = await async_client.post("/user/register", json=request_data)
+
+    assert response.status_code == 400
+    assert "Passwords does not match" in response.json()["detail"]
+
+
+@pytest.mark.anyio
+async def test_get_logged_in_user_200_if_authenticated(
+    registered_user: dict, created_user_token: str, async_client: AsyncClient
+):
+    """Test access to current user data successfull with authentication."""
+    # Creating a user in db (can be skipped, as a created_user_token fixture has it embedded)
+    user = registered_user
+
+    # Creating a token for a user
+    token = created_user_token
+
+    # Getting logged in user data with token authorization
+    response = await async_client.get(
+        "/user/", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 200
+    assert user["username"] in response.content.decode()
+
+
+@pytest.mark.anyio
 async def test_get_logged_in_user_401_if_not_authenticated(async_client: AsyncClient):
     """Test access to current user forbidden without user authentication."""
     response = await async_client.get("/user/")
@@ -72,10 +142,8 @@ async def test_get_user_401_if_not_authenticated(async_client: AsyncClient):
 
 
 @pytest.mark.anyio
-async def test_get_user_404_if_not_found(async_client: AsyncClient):
+async def test_get_user_404_if_user_not_found(async_client: AsyncClient):
     """Test access to user 'testuser' not found if testuser not in db."""
-    check_if_db_users_table_is_empty()
-
     # Verifying if there is no authenticated user
     logged_in_user = await async_client.get("/user/")
     assert logged_in_user.status_code == 401
@@ -96,15 +164,11 @@ async def test_get_user_404_if_not_found(async_client: AsyncClient):
 
 
 @pytest.mark.anyio
-async def test_get_user_200_with_auth_user(
-    async_client: AsyncClient,
-):
+async def test_get_user_200_with_auth_user(async_client: AsyncClient, created_user):
     """Test accessing existing user 'testuser' successfull with authentication
     of the same user."""
-    check_if_db_users_table_is_empty()
-
     # Creating a 'testuser'
-    user = create_db_user("testuser", "test@example.com", "password")
+    user = created_user
 
     # Mocking authorisation for a 'testuser'
     mock_authorisation(user=user)
@@ -122,14 +186,12 @@ async def test_get_user_200_with_auth_user(
 
 @pytest.mark.anyio
 async def test_get_user_with_other_username_200_with_admin_auth(
-    async_client: AsyncClient,
+    async_client: AsyncClient, created_user
 ):
     """Test accessing existing user 'testuser' successfull with authentication
     of the another user with admin role."""
-    check_if_db_users_table_is_empty()
-
     # Creating a 'testuser'
-    testuser = create_db_user("testuser", "test@example.com", "password", "user")
+    testuser = created_user
 
     # Mocking authorisation for a admin_user...
     mock_authorisation(username="admin_user", id=2, role="admin")
