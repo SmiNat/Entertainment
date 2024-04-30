@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from httpx import AsyncClient
 from jose import jwt
 
+from entertainment.exceptions import CredentialsException
 from entertainment.routers.auth import (
     access_token_expire_minutes,
     authenticate_user,
@@ -74,7 +75,7 @@ async def test_get_current_user_expired_token(mocker):
         "entertainment.routers.auth.access_token_expire_minutes", return_value=-1
     )
     token = create_access_token("testuser", 1, "user")
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(CredentialsException) as exc_info:
         await get_current_user(token)
     assert exc_info.value.status_code == 401
     assert "Token has expired" in exc_info.value.detail
@@ -87,7 +88,7 @@ async def test_get_current_user_expired_token(mocker):
 )
 async def test_get_current_user_invalid_credentials(username, user_id, user_role):
     token = create_access_token(username, user_id, user_role)
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(CredentialsException) as exc_info:
         await get_current_user(token)
     assert exc_info.value.status_code == 401
     assert "Could not validate credentials" in exc_info.value.detail

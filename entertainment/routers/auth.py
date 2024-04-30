@@ -14,6 +14,7 @@ from starlette import status
 
 from entertainment.database import get_db
 from entertainment.enums import TokenExp
+from entertainment.exceptions import CredentialsException
 from entertainment.models import Users
 
 load_dotenv()
@@ -32,13 +33,6 @@ ALGORITHM = os.environ.get("ALGORITHM")
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/token")
-
-
-credentials_exception = HTTPException(
-    status_code=status.HTTP_401_UNAUTHORIZED,
-    detail="Could not validate credentials",
-    headers={"WWW-Authenticate": "Bearer"},
-)
 
 
 class Token(BaseModel):
@@ -102,19 +96,15 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
         )
 
         if username is None or user_id is None or user_role is None:
-            raise credentials_exception
+            raise CredentialsException()
 
         return {"username": username, "id": user_id, "role": user_role}
 
     except ExpiredSignatureError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired.",
-            headers={"WWW-Authenticate": "Bearer"},
-        ) from e
+        raise CredentialsException(detail="Token has expired.") from e
 
     except JWTError:
-        raise credentials_exception
+        raise CredentialsException()
 
 
 @router.post("/token", response_model=Token, status_code=status.HTTP_200_OK)
@@ -122,7 +112,7 @@ async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: db_dependency,
 ) -> dict[str, str]:
-    user = authenticate_user(form_data.username, form_data.password, db)
+    user = authenticate_user(form_data.username.strip(), form_data.password.strip(), db)
     token = create_access_token(
         user.username,
         str(user.id),

@@ -27,15 +27,15 @@ user_dependency = Annotated[dict, Depends(get_current_user)]
 
 
 class User(BaseModel):
-    username: str = Field(min_length=5)
+    username: str = Field(min_length=5, examples=["username"])
     email: EmailStr
     first_name: str | None = Field(default=None, min_length=2, examples=[None])
     last_name: str | None = Field(default=None, min_length=2, examples=[None])
 
 
 class CreateUser(User):
-    password: str = Field(min_length=8, format="password")
-    confirm_password: str = Field(min_length=8, format="password")
+    password: str = Field(min_length=8, examples=["password"])
+    confirm_password: str = Field(min_length=8, examples=["password"])
 
 
 class GetUser(User):
@@ -104,8 +104,8 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> dict:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Passwords does not match.")
 
     user_model = Users(
-        username=new_user.username,
-        email=new_user.email,
+        username=new_user.username.strip(),
+        email=new_user.email.strip(),
         first_name=new_user.first_name,
         last_name=new_user.last_name,
         hashed_password=bcrypt_context.hash(new_user.password.strip()),

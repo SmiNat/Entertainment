@@ -56,13 +56,19 @@ async def test_create_user_201_with_fixture(registered_user: dict):
 
 
 @pytest.mark.anyio
+async def test_get_logged_in_user_401_if_not_authenticated(async_client: AsyncClient):
+    """Test access to current user forbidden without user authentication."""
+    response = await async_client.get("/user/")
+    assert response.status_code == 401
+    assert "Not authenticated" in response.content.decode()
+
+
+@pytest.mark.anyio
 async def test_get_user_401_if_not_authenticated(async_client: AsyncClient):
     """Test access to user 'testuser' forbidden without user authentication."""
     response = await async_client.get("/user/testuser")
     assert response.status_code == 401
-    assert "Not authenticated" in response.content.decode()  # remove !!!
-    assert "Not authenticated" in response.text  # remove !!!
-    assert "Not authenticated" == response.json()["detail"]  # remove !!!
+    assert "Not authenticated" in response.text
 
 
 @pytest.mark.anyio

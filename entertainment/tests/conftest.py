@@ -185,8 +185,8 @@ async def registered_user(async_client: AsyncClient) -> dict:
 
 
 @pytest.fixture
-async def created_user_token(async_client, created_user) -> dict:
-    user = created_user
+async def created_user_token(async_client, registered_user) -> dict:
+    user = registered_user
     token = create_access_token(
         username=user["username"],
         user_id=user["id"],
