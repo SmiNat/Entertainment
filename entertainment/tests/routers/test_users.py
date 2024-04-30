@@ -1,6 +1,7 @@
 import os
 
 import pytest
+from httpx import AsyncClient
 
 from entertainment.database import get_db  # noqa
 from entertainment.main import app  # noqa
@@ -23,8 +24,8 @@ logger = logging.getLogger(__name__)
 COMMEND = "pytest --disable-warnings --log-cli-level=DEBUG -s"
 
 
-@pytest.mark.asyncio
-async def test_create_user_201(client):
+@pytest.mark.anyio
+async def test_create_user_201(async_client: AsyncClient):
     """Test creating a new user is successfull."""
     request_data = {
         "username": "deadpool",
@@ -34,7 +35,7 @@ async def test_create_user_201(client):
         "password": "deadpool123",
         "confirm_password": "deadpool123",
     }
-    response = client.post("/user/register", json=request_data)
+    response = await async_client.post("/user/register", json=request_data)
 
     logger.debug("\nTEST - response.text: %s" % response.text)
 
@@ -44,7 +45,18 @@ async def test_create_user_201(client):
 
 
 @pytest.mark.anyio
-async def test_get_user_401_if_not_authenticated(async_client):
+async def test_create_user_201_with_fixture(registered_user: dict):
+    """Test creating a new user with fixture is successfull."""
+    user = registered_user
+    assert "testuser" in user["username"]
+    assert (
+        TestingSessionLocal().query(Users).filter(Users.username == "testuser").first()
+        is not None
+    )
+
+
+@pytest.mark.anyio
+async def test_get_user_401_if_not_authenticated(async_client: AsyncClient):
     """Test access to user 'testuser' forbidden without user authentication."""
     response = await async_client.get("/user/testuser")
     assert response.status_code == 401
@@ -54,7 +66,7 @@ async def test_get_user_401_if_not_authenticated(async_client):
 
 
 @pytest.mark.anyio
-async def test_get_user_404_if_not_found(async_client):
+async def test_get_user_404_if_not_found(async_client: AsyncClient):
     """Test access to user 'testuser' not found if testuser not in db."""
     check_if_db_users_table_is_empty()
 
@@ -79,7 +91,7 @@ async def test_get_user_404_if_not_found(async_client):
 
 @pytest.mark.anyio
 async def test_get_user_200_with_auth_user(
-    async_client,
+    async_client: AsyncClient,
 ):
     """Test accessing existing user 'testuser' successfull with authentication
     of the same user."""
@@ -103,7 +115,9 @@ async def test_get_user_200_with_auth_user(
 
 
 @pytest.mark.anyio
-async def test_get_user_with_other_username_200_with_admin_auth(async_client):
+async def test_get_user_with_other_username_200_with_admin_auth(
+    async_client: AsyncClient,
+):
     """Test accessing existing user 'testuser' successfull with authentication
     of the another user with admin role."""
     check_if_db_users_table_is_empty()
@@ -127,7 +141,9 @@ async def test_get_user_with_other_username_200_with_admin_auth(async_client):
 
 
 @pytest.mark.anyio
-async def test_get_user_with_other_username_403_with_no_amin_auth(async_client):
+async def test_get_user_with_other_username_403_with_no_amin_auth(
+    async_client: AsyncClient,
+):
     """Test accessing existing user 'test_user' forbidden with authentication
     of the another user without admin role."""
     check_if_db_users_table_is_empty()

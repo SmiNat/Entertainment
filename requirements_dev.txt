@@ -1,6 +1,7 @@
 httpx
 pytest
 pytest-asyncio
+pytest-mock
 ruff
 black
 isort

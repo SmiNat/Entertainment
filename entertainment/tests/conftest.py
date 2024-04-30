@@ -22,46 +22,34 @@ from entertainment.routers.auth import (  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
-# Creating test.db instead of using application db (entertainment.db)
+# Creating test.db database instead of using application db (entertainment.db)
 engine = create_engine(
     config.DATABASE_URL,  # test.db
     connect_args={"check_same_thread": False},
     echo=False,
-    # poolclass=StaticPool,
 )
 
 Base.metadata.drop_all(bind=engine)
+# Base.metadata.drop_all(bind=engine, tables=[Users.__table__], checkfirst=True)
 Base.metadata.create_all(bind=engine)
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 # Overriding database connection for all of the endpoins
-# @pytest.fixture
 def override_get_db():
     """Sets a clean db session for each test."""
     db = TestingSessionLocal()
     try:
         yield db
     finally:
-        # for table in reversed(Base.metadata.sorted_tables):
-        #     db.execute(table.delete())
-        # db.execute(text("DELETE FROM users"))
-        # db.commit()
         db.close()
 
 
 app.dependency_overrides[get_db] = override_get_db
 
 
-# @pytest.fixture
-# def delete_db():
-#     """Removes the test.db file."""
-#     os.remove(
-#         os.path.join(os.path.dirname(os.path.abspath(__file__)), config.DATABASE_PATH)
-#     )
-
-
+# Cleaning db tables after each test
 @pytest.fixture(autouse=True, scope="function")
 def clean_db():
     """Cleans db session for each test."""
@@ -69,10 +57,6 @@ def clean_db():
     db.execute(text("DELETE FROM users"))
     db.commit()
     db.close()
-    # Base.metadata.drop_all(
-    #     bind=engine
-    # )  # Base.metadata.drop_all(bind=engine, tables=[Users.__table__], checkfirst=True)
-    # Base.metadata.create_all(bind=engine)
 
 
 # Overriding fixture pytest.mark.anyio to test async functions
@@ -100,6 +84,7 @@ async def async_client(client) -> AsyncGenerator:
         yield ac
 
 
+# Some helpful functions to use in tests
 def create_db_user(
     username: str,
     email: str,
@@ -125,7 +110,6 @@ def create_db_user(
         db.refresh(new_user)
         return new_user
     finally:
-        # db.reset()
         db.close()
 
 
@@ -162,7 +146,6 @@ def mock_authorisation(
         }
 
 
-# @pytest.fixture
 def check_if_db_users_table_is_empty():
     db = TestingSessionLocal()
     db_content = db.query(Users).all()
@@ -184,9 +167,9 @@ def create_user_token(username: str, email: str, password: str, role: str = "use
     return token
 
 
-# Creating app fixtures
+# Some app fixtures to use in tests
 @pytest.fixture
-async def created_user(async_client: AsyncClient) -> dict:
+async def registered_user(async_client: AsyncClient) -> dict:
     payload = {
         "username": "testuser",
         "email": "test@example.com",
@@ -199,10 +182,6 @@ async def created_user(async_client: AsyncClient) -> dict:
     user = await async_client.post("/user/register", json=payload)
     # user = async_client.post("/user", params="testuser")
     return user.json()
-    # albo:
-    # query = TestingSessionLocal().query(Users).filter(Users.email == payload["email"]).first()
-    # payload["id"] = query.id
-    # return payload
 
 
 @pytest.fixture
@@ -214,29 +193,3 @@ async def created_user_token(async_client, created_user) -> dict:
         role=user["role"],
     )
     return token
-
-
-@pytest.fixture(scope="module")
-def test_user():
-    return {
-        "username": "testuser",
-        "password": "testpass123",
-    }
-
-
-def test_login(client, test_user):
-    response = client.post("/token", data=test_user)
-    assert response.status_code == 200
-    token = response.json()["access_token"]
-    assert token is not None
-    return token
-
-
-# @pytest.fixture()
-# async def create_db_records(async_client: AsyncClient):
-#     movie = {
-#         "title": "Test movie",
-#         "premiere": "2024-1-1",
-#         "score": 9,
-#         "genres": ["action", "drama"],
-#     }

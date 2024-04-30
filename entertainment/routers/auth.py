@@ -6,7 +6,7 @@ from typing import Annotated
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
+from jose import ExpiredSignatureError, JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -34,12 +34,45 @@ bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 
+credentials_exception = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="Could not validate credentials",
+    headers={"WWW-Authenticate": "Bearer"},
+)
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str
 
 
 db_dependency = Annotated[Session, Depends(get_db)]
+
+
+def access_token_expire_minutes() -> int:
+    return TokenExp.ACCESS_TOKEN_EXPIRE_MINUTES
+
+
+def create_access_token(
+    username: str,
+    user_id: int,
+    role: str,
+    expires_delta: timedelta | None = None,
+):
+    payload_to_encode = {"sub": username, "id": user_id, "role": role}
+    logger.debug("Payload for create_access_token: %s" % payload_to_encode)
+
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(
+            minutes=access_token_expire_minutes()
+        )
+    payload_to_encode.update({"exp": expire})
+
+    logger.debug("Access token created for the user: %s." % username)
+
+    return jwt.encode(payload_to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def authenticate_user(username: str, password: str, db: Session):
@@ -56,44 +89,32 @@ def authenticate_user(username: str, password: str, db: Session):
     return user
 
 
-def create_access_token(
-    username: str,
-    user_id: int,
-    role: str,
-    expires_delta: timedelta | None = None,
-):
-    payload_to_encode = {"sub": username, "id": user_id, "role": role}
-    logger.debug("Payload for create_access_token: %s" % payload_to_encode)
-
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(
-            minutes=TokenExp.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
-    payload_to_encode.update({"exp": expire})
-
-    logger.debug("Access token created for the user: '%s'." % username)
-
-    return jwt.encode(payload_to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
-
 async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
+        logger.debug("Payload for get_current_user: %s" % payload)
         username: str = payload.get("sub")
         user_id: int = payload.get("id")
         user_role: str = payload.get("role")
-        if not username or not user_id:
-            return HTTPException(
-                status.HTTP_401_UNAUTHORIZED, "Could not validate credentials."
-            )
-        logger.debug("Current user: '%s'." % username)
-        return {"username": username, "id": user_id, "role": user_role}
-    except JWTError:
-        return HTTPException(
-            status.HTTP_401_UNAUTHORIZED, "Could not validate credentials."
+        logger.debug(
+            "Current user data: username: %s, id: %s, role: %s."
+            % (username, user_id, user_role)
         )
+
+        if username is None or user_id is None or user_role is None:
+            raise credentials_exception
+
+        return {"username": username, "id": user_id, "role": user_role}
+
+    except ExpiredSignatureError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired.",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from e
+
+    except JWTError:
+        raise credentials_exception
 
 
 @router.post("/token", response_model=Token, status_code=status.HTTP_200_OK)
@@ -109,6 +130,6 @@ async def login_for_access_token(
         timedelta(minutes=TokenExp.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 
-    logger.debug("Access token returned for the user: '%s'." % user.username)
+    logger.debug("Access token returned for the user: %s." % user.username)
 
     return {"access_token": token, "token_type": "bearer"}
