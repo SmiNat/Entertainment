@@ -12,6 +12,7 @@ from entertainment.tests.conftest import (  # noqa
     TestingSessionLocal,
     check_if_db_users_table_is_empty,
     create_db_user,
+    create_user_and_token,
     mock_authorisation,
 )
 
@@ -134,6 +135,54 @@ async def test_get_logged_in_user_401_if_not_authenticated(async_client: AsyncCl
 
 
 @pytest.mark.anyio
+async def test_get_user_200_with_auth_user(
+    async_client: AsyncClient, registered_user: dict, created_user_token: str
+):
+    """Test accessing existing user 'testuser' successfull with authentication
+    of the same user."""
+    # Creating a 'testuser'
+    user = registered_user
+
+    # Creating a token for a user
+    token = created_user_token
+
+    # Calling the endpoint for 'testuser' with 'testuser' authenticated
+    response = await async_client.get(
+        "/user/testuser", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 200
+    assert user["username"] in response.json()["username"]
+    # assert logged_in_user.json()["username"] == "admin_user"
+    # assert logged_in_user.json()["role"] == "admin"
+    # logger.debug("\nTEST - <logged in user>: %s" % logged_in_user.json())
+
+
+@pytest.mark.anyio
+async def test_get_user_with_other_username_200_with_admin_auth(
+    registered_user: dict, async_client: AsyncClient
+):
+    """Test accessing existing user 'testuser' successfull with authentication
+    of the another user with admin role."""
+    # Creating a 'testuser'
+    testuser = registered_user
+
+    # Creating admin_user and token for an admin_user
+    admin_token = create_user_and_token(
+        username="admin_user",
+        email="admin@example.com",
+        password="password",
+        role="admin",
+    )
+
+    # Endpoint call for 'testuser' with authentication of 'admin_user'
+    response = await async_client.get(
+        "/user/testuser", headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    assert response.status_code == 200
+    assert testuser["username"] == response.json()["username"]
+
+
+@pytest.mark.anyio
 async def test_get_user_401_if_not_authenticated(async_client: AsyncClient):
     """Test access to user 'testuser' forbidden without user authentication."""
     response = await async_client.get("/user/testuser")
@@ -142,94 +191,44 @@ async def test_get_user_401_if_not_authenticated(async_client: AsyncClient):
 
 
 @pytest.mark.anyio
-async def test_get_user_404_if_user_not_found(async_client: AsyncClient):
-    """Test access to user 'testuser' not found if testuser not in db."""
-    # Verifying if there is no authenticated user
-    logged_in_user = await async_client.get("/user/")
-    assert logged_in_user.status_code == 401
-
-    # Mocking authorisation for a 'testuser'
-    mock_authorisation(username="testuser", id=1, role="admin")
-    # Veryfying if 'testuser' was successfully authenticated
-    logged_in_user = await async_client.get("/user/")
-    assert logged_in_user.status_code == 200
-    assert logged_in_user.json()["username"] == "testuser"
-    logger.debug("\nTEST - <logged in user>: %s" % logged_in_user.json())
+async def test_get_user_404_if_user_not_found(
+    async_client: AsyncClient, created_user_token: str
+):
+    """Test access to user 'someuser' not found if someuser not in db."""
+    # Creating testuser and token for the testuser
+    token = created_user_token
 
     # Calling the endpoint for 'someuser' with 'testuser' authenticated
-    response = await async_client.get("/user/someuser")
+    response = await async_client.get(
+        "/user/someuser", headers={"Authorization": f"Bearer {token}"}
+    )
     assert response.status_code == 404
     msg = "User 'someuser' not found in the database."
     assert msg in response.content.decode()
 
 
 @pytest.mark.anyio
-async def test_get_user_200_with_auth_user(async_client: AsyncClient, created_user):
-    """Test accessing existing user 'testuser' successfull with authentication
-    of the same user."""
-    # Creating a 'testuser'
-    user = created_user
-
-    # Mocking authorisation for a 'testuser'
-    mock_authorisation(user=user)
-    # Veryfying if 'testuser' was successfully authenticated
-    logged_in_user = await async_client.get("/user/")
-    assert logged_in_user.status_code == 200
-    assert logged_in_user.json()["username"] == "testuser"
-    logger.debug("\nTEST - <logged in user>: %s" % logged_in_user.json())
-
-    # Calling the endpoint for 'testuser' with 'testuser' authenticated
-    response = await async_client.get("/user/testuser")
-    assert response.status_code == 200
-    assert logged_in_user.json()["username"] == "testuser"
-
-
-@pytest.mark.anyio
-async def test_get_user_with_other_username_200_with_admin_auth(
-    async_client: AsyncClient, created_user
-):
-    """Test accessing existing user 'testuser' successfull with authentication
-    of the another user with admin role."""
-    # Creating a 'testuser'
-    testuser = created_user
-
-    # Mocking authorisation for a admin_user...
-    mock_authorisation(username="admin_user", id=2, role="admin")
-    # Veryfying if 'admin_user' was successfully authenticated
-    logged_in_user = await async_client.get("/user/")
-    assert logged_in_user.status_code == 200
-    assert logged_in_user.json()["username"] == "admin_user"
-    assert logged_in_user.json()["role"] == "admin"
-    logger.debug("\nTEST - <logged in user>: %s" % logged_in_user.json())
-
-    # Endpoint call for 'testuser' with authentication of 'admin_user'
-    response = await async_client.get(f"/user/{testuser.username}")
-    assert response.status_code == 200
-    assert testuser.username == response.json()["username"]
-
-
-@pytest.mark.anyio
 async def test_get_user_with_other_username_403_with_no_amin_auth(
-    async_client: AsyncClient,
+    async_client: AsyncClient, registered_user: dict
 ):
-    """Test accessing existing user 'test_user' forbidden with authentication
+    """Test accessing existing user 'testuser' forbidden with authentication
     of the another user without admin role."""
-    check_if_db_users_table_is_empty()
-
     # Creating a 'testuser'
-    testuser = create_db_user("testuser", "test@example.com", "password", "user")
+    testuser = registered_user
 
-    # Mocking authorisation for a non_admin_user...
-    mock_authorisation(username="non_admin_user", id=2, role="user")
-    # Veryfying if 'non_admin_user' was successfully authenticated
-    logged_in_user = await async_client.get("/user/")
-    assert logged_in_user.status_code == 200
-    assert logged_in_user.json()["username"] == "non_admin_user"
-    assert logged_in_user.json()["role"] == "user"
-    logger.debug("\nTEST - <logged in user>: %s" % logged_in_user.json())
+    # Creating no_admin_user and token for an no_admin_user
+    no_admin_token = create_user_and_token(
+        username="simple_user",
+        email="simple@example.com",
+        password="password",
+        role="user",
+    )
 
     # Endpoint call for 'testuser' with authentication of 'non_admin_user'
-    response = await async_client.get(f"/user/{testuser.username}")
+    response = await async_client.get(
+        "/user/testuser",
+        headers={"Authorization": f"Bearer {no_admin_token}"},
+    )
     assert response.status_code == 403
     msg = "Permission denied. Access to see other users' data is restricted."
     assert msg == response.json()["detail"]

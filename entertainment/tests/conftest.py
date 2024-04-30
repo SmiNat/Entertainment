@@ -160,9 +160,8 @@ def check_if_db_users_table_is_empty():
         raise DatabaseNotEmptyError("Users table not empty.")
 
 
-def create_user_token(username: str, email: str, password: str, role: str = "user"):
+def create_user_and_token(username: str, email: str, password: str, role: str = "user"):
     user = create_db_user(username, email, password, role)
-    mock_authorisation(user)
     token = create_access_token(user.username, user.id, user.role)
     return token
 
