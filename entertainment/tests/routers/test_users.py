@@ -279,7 +279,7 @@ async def test_update_user_204(async_client: AsyncClient, registered_user: dict)
 
 @pytest.mark.anyio
 async def test_update_user_401_if_not_authenticated(async_client: AsyncClient):
-    # Calling the update_user endpoint
+    # Calling the update_user endpoint without user authentication
     payload = {
         "email": None,
         "first_name": "John",
@@ -295,30 +295,30 @@ async def test_update_user_400_email_already_taken(
     async_client: AsyncClient, created_user_token: tuple
 ):
     # Creating some other user
-    payload = {
+    other_user = {
         "username": "otheruser",
         "email": "other@example.com",
         "password": "password",
         "confirm_password": "password",
     }
-    response = await async_client.post("/user/register", json=payload)
+    response = await async_client.post("/user/register", json=other_user)
     assert response.status_code == 201
 
     # Creating a 'testuser' and a token for a 'testuser'
     user, token = created_user_token
 
-    # Getting the logged in user data
+    # Getting the logged in user data (to verify email address for logged in user)
     response = await async_client.get(
         "/user/check/testuser", headers={"Authorization": f"Bearer {token}"}
     )
     assert response.status_code == 200
-    original_user = response.json()
-    assert user["username"] in original_user["username"]
-    assert original_user["email"] == "test@example.com"
+    assert user["username"] in response.json()["username"]
+    assert response.json()["email"] == "test@example.com"
 
-    # Calling the update_user endpoint for 'testuser' with already taken email
+    # Calling the update_user endpoint for 'testuser' with attempt to change
+    # the email to already taken one
     payload = {
-        "email": "other@example.com",
+        "email": other_user["email"],
         "first_name": "John",
         "last_name": "Doe",
     }
@@ -330,8 +330,12 @@ async def test_update_user_400_email_already_taken(
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize(
+    "invalid_email",
+    [("invalid"), ("invalid@"), ("@invalid"), ("sth@invalid")],
+)
 async def test_update_user_422_email_invalid(
-    async_client: AsyncClient, created_user_token: tuple
+    async_client: AsyncClient, created_user_token: tuple, invalid_email
 ):
     # Creating a 'testuser' and a token for a 'testuser'
     user, token = created_user_token
@@ -347,7 +351,7 @@ async def test_update_user_422_email_invalid(
 
     # Calling the update_user endpoint for 'testuser' with already taken email
     payload = {
-        "email": "invalid_mail",
+        "email": invalid_email,
         "first_name": "John",
         "last_name": "Doe",
     }
@@ -355,7 +359,7 @@ async def test_update_user_422_email_invalid(
         "/user/update", json=payload, headers={"Authorization": f"Bearer {token}"}
     )
     assert response.status_code == 422
-    assert "The email address is not valid" in response.text
+    assert "value is not a valid email address" in response.text
 
 
 @pytest.mark.anyio
@@ -378,7 +382,7 @@ async def test_delete_user_204(async_client: AsyncClient, created_user_token: tu
     assert response.status_code == 200
     assert testuser["username"] == response.json()["username"]
 
-    # Calling delete_user endpoint by 'testuser' (deleting 'testuser')
+    # Calling delete_user endpoint by the 'testuser' (deleting 'testuser')
     response = await async_client.delete(
         "/user/delete", headers={"Authorization": f"Bearer {testuser_token}"}
     )
@@ -394,7 +398,7 @@ async def test_delete_user_204(async_client: AsyncClient, created_user_token: tu
 
 @pytest.mark.anyio
 async def test_delete_user_401_if_not_authenticated(async_client: AsyncClient):
-    # Calling the delete_user endpoint
+    # Calling the delete_user endpoint without authentication
     response = await async_client.delete("/user/delete")
     assert response.status_code == 401
     assert "Not authenticated" in response.content.decode()
