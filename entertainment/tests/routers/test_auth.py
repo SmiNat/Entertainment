@@ -36,14 +36,17 @@ def test_create_access_token():
 
 @pytest.mark.anyio
 async def test_authenticate_user(registered_user: dict):
+    # Creating a user: registered_user fixture
+    # Calling authenticate_user funcion
     user = authenticate_user(
         registered_user["username"], "testpass123", TestingSessionLocal()
     )
+    # Verifying if authenticated user == to a registred user
     assert user.email == registered_user["email"]
 
 
-@pytest.mark.anyio
-async def test_authenticate_user_username_not_found(registered_user: dict):
+def test_authenticate_user_username_not_found_raises_404():
+    # Calling authenticate_user funcion with non existing user
     with pytest.raises(HTTPException) as exc_info:
         authenticate_user("fake_username", "testpass123", TestingSessionLocal())
     assert isinstance(exc_info.value, HTTPException)
@@ -52,7 +55,9 @@ async def test_authenticate_user_username_not_found(registered_user: dict):
 
 
 @pytest.mark.anyio
-async def test_authenticate_user_incorrect_password(registered_user: dict):
+async def test_authenticate_user_incorrect_password_raises_401(registered_user: dict):
+    # Creating a user: registered_user fixture (with password: testpass123)
+    # Calling authenticate_user funcion with incorrect password
     with pytest.raises(HTTPException) as exc_info:
         authenticate_user(
             registered_user["username"], "fake_password", TestingSessionLocal()
@@ -64,17 +69,22 @@ async def test_authenticate_user_incorrect_password(registered_user: dict):
 
 @pytest.mark.anyio
 async def test_get_current_user():
+    # Creating token for a user
     token = create_access_token("testuser", 1, "user")
+    # Verifying get_current_user response
     response = await get_current_user(token)
     assert {"username": "testuser", "id": 1, "role": "user"}.items() == response.items()
 
 
 @pytest.mark.anyio
-async def test_get_current_user_expired_token(mocker):
+async def test_get_current_user_expired_token_raises_401(mocker):
+    # Mocking access_token_expire_minutes function (to create a token which is already expired)
     mocker.patch(
         "entertainment.routers.auth.access_token_expire_minutes", return_value=-1
     )
+    # Creating expired token
     token = create_access_token("testuser", 1, "user")
+    # Calling get_current_user funcion with expired token
     with pytest.raises(CredentialsException) as exc_info:
         await get_current_user(token)
     assert exc_info.value.status_code == 401
@@ -86,8 +96,12 @@ async def test_get_current_user_expired_token(mocker):
     "username, user_id, user_role",
     [(None, 1, "user"), ("testuser", None, "admin"), ("testuser", 1, None)],
 )
-async def test_get_current_user_invalid_credentials(username, user_id, user_role):
+async def test_get_current_user_invalid_credentials_raises_401(
+    username, user_id, user_role
+):
+    # Creating token with invalid data
     token = create_access_token(username, user_id, user_role)
+    # Calling get_current_user funcion with invalid token
     with pytest.raises(CredentialsException) as exc_info:
         await get_current_user(token)
     assert exc_info.value.status_code == 401
@@ -95,7 +109,9 @@ async def test_get_current_user_invalid_credentials(username, user_id, user_role
 
 
 @pytest.mark.anyio
-async def test_login_user(async_client: AsyncClient, registered_user: dict):
+async def test_login_for_access_token(async_client: AsyncClient, registered_user: dict):
+    # Creating a user: registered_user fixture
+    # Calling login_for_access_token function
     response = await async_client.post(
         "/auth/token",
         data={
@@ -109,7 +125,9 @@ async def test_login_user(async_client: AsyncClient, registered_user: dict):
 
 
 @pytest.mark.anyio
-async def test_login_user_not_exists(async_client: AsyncClient):
+async def test_login_for_access_token_404_with_non_existing_user(
+    async_client: AsyncClient,
+):
     response = await async_client.post(
         "/auth/token", data={"username": "fake_user", "password": "password"}
     )

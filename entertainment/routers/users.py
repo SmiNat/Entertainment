@@ -49,9 +49,10 @@ class GetUser(User):
         from_attributes = True
 
 
-class UpdateUser(User):
-    username: str | None = Field(min_length=5, examples=[None])
+class UpdateUser(BaseModel):
     email: EmailStr | None = Field(examples=[None])
+    first_name: str | None = Field(default=None, min_length=2, examples=[None])
+    last_name: str | None = Field(default=None, min_length=2, examples=[None])
 
 
 class ChangePassword(BaseModel):
@@ -60,13 +61,13 @@ class ChangePassword(BaseModel):
     confirm_password: str = Field(min_length=8, format="password")
 
 
-@router.get("/")
+@router.get("/current")
 # async def get_logged_in_user(current_user: User = Depends(get_current_user)):
 async def get_logged_in_user(current_user: user_dependency):
     return current_user
 
 
-@router.get("/{username}", status_code=status.HTTP_200_OK, response_model=GetUser)
+@router.get("/check/{username}", status_code=status.HTTP_200_OK, response_model=GetUser)
 async def get_user(username: str, db: db_dependency, user: user_dependency):
     requested_user = db.query(Users).filter(Users.username == username).first()
 
@@ -127,16 +128,22 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> dict:
     return user_model
 
 
-@router.patch("/", status_code=status.HTTP_204_NO_CONTENT)
+@router.patch("/update", status_code=status.HTTP_204_NO_CONTENT)
 async def update_user(
     db: db_dependency, user: user_dependency, data: UpdateUser
 ) -> None:
     authenticated_user = db.query(Users).filter(Users.id == user["id"]).first()
 
-    for field, value in data.model_dump(exclude_unset=True, exclude_none=True).items():
-        setattr(authenticated_user, field, value)
-
-    db.commit()
+    updated_fields = data.model_dump(exclude_unset=True, exclude_none=True)
+    try:
+        for field, value in updated_fields.items():
+            setattr(authenticated_user, field, value)
+        db.commit()
+        db.refresh(authenticated_user)
+    except IntegrityError as e:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail=f"{DatabaseError(e._message())}"
+        )
 
     logger.debug(
         "Patch on update user - successfully updated a user '%s'."
@@ -144,7 +151,7 @@ async def update_user(
     )
 
 
-@router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/delete", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(db: db_dependency, user: user_dependency) -> None:
     authenticated_user = db.query(Users).filter(Users.id == user["id"]).first()
 
@@ -174,13 +181,14 @@ async def change_password(
         )
 
     if not password.new_password.strip() == password.confirm_password.strip():
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Passwords does not match.")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Passwords do not match.")
 
     authenticated_user.hashed_password = bcrypt_context.hash(
         password.new_password.strip()
     )
     db.add(authenticated_user)
     db.commit()
+    db.refresh(authenticated_user)
 
     logger.debug(
         "Put on change password - successfully changed password for a user '%s'."
