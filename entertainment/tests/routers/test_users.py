@@ -6,7 +6,12 @@ from httpx import AsyncClient
 from entertainment.database import get_db  # noqa
 from entertainment.main import app  # noqa
 from entertainment.models import Users  # noqa
-from entertainment.routers.auth import create_access_token, get_current_user  # noqa
+from entertainment.routers.auth import (  # noqa
+    authenticate_user,
+    bcrypt_context,
+    create_access_token,
+    get_current_user,
+)
 from entertainment.routers.users import get_logged_in_user  # noqa
 from entertainment.tests.conftest import (  # noqa
     TestingSessionLocal,
@@ -48,6 +53,7 @@ async def test_create_user_201(async_client: AsyncClient):
 @pytest.mark.anyio
 async def test_create_user_201_with_fixture(registered_user: dict):
     """Test creating a new user with fixture is successfull."""
+    # Creating a user with registered_user fixture
     user = registered_user
     assert "testuser" in user["username"]
     assert (
@@ -58,12 +64,12 @@ async def test_create_user_201_with_fixture(registered_user: dict):
 
 @pytest.mark.anyio
 async def test_create_user_400_with_not_unique_username(
-    async_client: AsyncClient, created_user
+    async_client: AsyncClient, registered_user: dict
 ):
     """Test creating a new user rejected if username already taken."""
-    user_in_db = created_user
+    user_in_db = registered_user
     request_data = {
-        "username": user_in_db.username,
+        "username": user_in_db["username"],
         "email": "deadpool@example.com",
         "password": "deadpool123",
         "confirm_password": "deadpool123",
@@ -76,13 +82,13 @@ async def test_create_user_400_with_not_unique_username(
 
 @pytest.mark.anyio
 async def test_create_user_400_with_not_unique_email(
-    async_client: AsyncClient, created_user
+    async_client: AsyncClient, registered_user: dict
 ):
     """Test creating a new user rejected if email is already taken."""
-    user_in_db = created_user
+    user_in_db = registered_user
     request_data = {
         "username": "deadpool",
-        "email": user_in_db.email,
+        "email": user_in_db["email"],
         "password": "deadpool123",
         "confirm_password": "deadpool123",
     }
@@ -93,7 +99,7 @@ async def test_create_user_400_with_not_unique_email(
 
 
 @pytest.mark.anyio
-async def test_create_user_400_with_incorrect_password(async_client: AsyncClient):
+async def test_create_user_400_with_unmatched_password(async_client: AsyncClient):
     """Test creating a new user rejected passwords does not match."""
     request_data = {
         "username": "deadpool",
@@ -109,18 +115,15 @@ async def test_create_user_400_with_incorrect_password(async_client: AsyncClient
 
 @pytest.mark.anyio
 async def test_get_logged_in_user_200_if_authenticated(
-    registered_user: dict, created_user_token: str, async_client: AsyncClient
+    created_user_token: tuple, async_client: AsyncClient
 ):
     """Test access to current user data successfull with authentication."""
-    # Creating a user in db (can be skipped, as a created_user_token fixture has it embedded)
-    user = registered_user
-
-    # Creating a token for a user
-    token = created_user_token
+    # Creating a 'testuser' and a token for a 'testuser'
+    user, token = created_user_token
 
     # Getting logged in user data with token authorization
     response = await async_client.get(
-        "/user/", headers={"Authorization": f"Bearer {token}"}
+        "/user/current", headers={"Authorization": f"Bearer {token}"}
     )
     assert response.status_code == 200
     assert user["username"] in response.content.decode()
@@ -129,32 +132,26 @@ async def test_get_logged_in_user_200_if_authenticated(
 @pytest.mark.anyio
 async def test_get_logged_in_user_401_if_not_authenticated(async_client: AsyncClient):
     """Test access to current user forbidden without user authentication."""
-    response = await async_client.get("/user/")
+    response = await async_client.get("/user/current")
     assert response.status_code == 401
     assert "Not authenticated" in response.content.decode()
 
 
 @pytest.mark.anyio
-async def test_get_user_200_with_auth_user(
-    async_client: AsyncClient, registered_user: dict, created_user_token: str
+async def test_get_user_200_if_authenticated(
+    async_client: AsyncClient, created_user_token: tuple
 ):
     """Test accessing existing user 'testuser' successfull with authentication
     of the same user."""
-    # Creating a 'testuser'
-    user = registered_user
-
-    # Creating a token for a user
-    token = created_user_token
+    # Creating a 'testuser' and a token for a 'testuser'
+    user, token = created_user_token
 
     # Calling the endpoint for 'testuser' with 'testuser' authenticated
     response = await async_client.get(
-        "/user/testuser", headers={"Authorization": f"Bearer {token}"}
+        "/user/check/testuser", headers={"Authorization": f"Bearer {token}"}
     )
     assert response.status_code == 200
     assert user["username"] in response.json()["username"]
-    # assert logged_in_user.json()["username"] == "admin_user"
-    # assert logged_in_user.json()["role"] == "admin"
-    # logger.debug("\nTEST - <logged in user>: %s" % logged_in_user.json())
 
 
 @pytest.mark.anyio
@@ -166,7 +163,7 @@ async def test_get_user_with_other_username_200_with_admin_auth(
     # Creating a 'testuser'
     testuser = registered_user
 
-    # Creating admin_user and token for an admin_user
+    # Creating 'admin_user' and token for an admin_user
     admin_token = create_user_and_token(
         username="admin_user",
         email="admin@example.com",
@@ -176,7 +173,7 @@ async def test_get_user_with_other_username_200_with_admin_auth(
 
     # Endpoint call for 'testuser' with authentication of 'admin_user'
     response = await async_client.get(
-        "/user/testuser", headers={"Authorization": f"Bearer {admin_token}"}
+        "/user/check/testuser", headers={"Authorization": f"Bearer {admin_token}"}
     )
     assert response.status_code == 200
     assert testuser["username"] == response.json()["username"]
@@ -185,22 +182,22 @@ async def test_get_user_with_other_username_200_with_admin_auth(
 @pytest.mark.anyio
 async def test_get_user_401_if_not_authenticated(async_client: AsyncClient):
     """Test access to user 'testuser' forbidden without user authentication."""
-    response = await async_client.get("/user/testuser")
+    response = await async_client.get("/user/check/testuser")
     assert response.status_code == 401
     assert "Not authenticated" in response.text
 
 
 @pytest.mark.anyio
 async def test_get_user_404_if_user_not_found(
-    async_client: AsyncClient, created_user_token: str
+    async_client: AsyncClient, created_user_token: tuple
 ):
     """Test access to user 'someuser' not found if someuser not in db."""
-    # Creating testuser and token for the testuser
-    token = created_user_token
+    # Creating 'testuser' and a token for the 'testuser'
+    user, token = created_user_token
 
     # Calling the endpoint for 'someuser' with 'testuser' authenticated
     response = await async_client.get(
-        "/user/someuser", headers={"Authorization": f"Bearer {token}"}
+        "/user/check/someuser", headers={"Authorization": f"Bearer {token}"}
     )
     assert response.status_code == 404
     msg = "User 'someuser' not found in the database."
@@ -214,9 +211,9 @@ async def test_get_user_with_other_username_403_with_no_amin_auth(
     """Test accessing existing user 'testuser' forbidden with authentication
     of the another user without admin role."""
     # Creating a 'testuser'
-    testuser = registered_user
+    testuser = registered_user  # noqa
 
-    # Creating no_admin_user and token for an no_admin_user
+    # Creating 'no_admin_user' and a token for an no_admin_user
     no_admin_token = create_user_and_token(
         username="simple_user",
         email="simple@example.com",
@@ -226,9 +223,262 @@ async def test_get_user_with_other_username_403_with_no_amin_auth(
 
     # Endpoint call for 'testuser' with authentication of 'non_admin_user'
     response = await async_client.get(
-        "/user/testuser",
+        "/user/check/testuser",
         headers={"Authorization": f"Bearer {no_admin_token}"},
     )
     assert response.status_code == 403
     msg = "Permission denied. Access to see other users' data is restricted."
     assert msg == response.json()["detail"]
+
+
+@pytest.mark.anyio
+async def test_update_user_204(async_client: AsyncClient, registered_user: dict):
+    # Creating a 'testuser'
+    user = registered_user
+
+    # Creating a token for a 'testuser'
+    response = await async_client.post(
+        "/auth/token", data={"username": user["username"], "password": "testpass123"}
+    )
+    token = response.json()["access_token"]
+
+    # Getting the logged in user data
+    response = await async_client.get(
+        "/user/check/testuser", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 200
+    original_user = response.json()
+    assert user["username"] in original_user["username"]
+    assert original_user["email"] == "test@example.com"
+    assert original_user["first_name"] is None
+    assert original_user["last_name"] is None
+    assert original_user["id"] == 1
+
+    # Calling the update_user endpoint for 'testuser'
+    payload = {
+        "email": None,
+        "first_name": "John",
+        "last_name": "Doe",
+    }
+    response = await async_client.patch(
+        "/user/update", json=payload, headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 204
+
+    # Token for updated user has not changed (the same username)
+    response = await async_client.get(
+        "/user/check/testuser", headers={"Authorization": f"Bearer {token}"}
+    )
+    current_user = response.json()
+    assert current_user["username"] == "testuser"
+    assert current_user["email"] == "test@example.com"
+    assert current_user["first_name"] == "John"
+    assert current_user["last_name"] == "Doe"
+    assert current_user["id"] == 1
+
+
+@pytest.mark.anyio
+async def test_update_user_401_if_not_authenticated(async_client: AsyncClient):
+    # Calling the update_user endpoint
+    payload = {
+        "email": None,
+        "first_name": "John",
+        "last_name": "Doe",
+    }
+    response = await async_client.patch("/user/update", json=payload)
+    assert response.status_code == 401
+    assert "Not authenticated" in response.content.decode()
+
+
+@pytest.mark.anyio
+async def test_update_user_400_email_already_taken(
+    async_client: AsyncClient, created_user_token: tuple
+):
+    # Creating some other user
+    payload = {
+        "username": "otheruser",
+        "email": "other@example.com",
+        "password": "password",
+        "confirm_password": "password",
+    }
+    response = await async_client.post("/user/register", json=payload)
+    assert response.status_code == 201
+
+    # Creating a 'testuser' and a token for a 'testuser'
+    user, token = created_user_token
+
+    # Getting the logged in user data
+    response = await async_client.get(
+        "/user/check/testuser", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 200
+    original_user = response.json()
+    assert user["username"] in original_user["username"]
+    assert original_user["email"] == "test@example.com"
+
+    # Calling the update_user endpoint for 'testuser' with already taken email
+    payload = {
+        "email": "other@example.com",
+        "first_name": "John",
+        "last_name": "Doe",
+    }
+    response = await async_client.patch(
+        "/user/update", json=payload, headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 400
+    assert "UNIQUE constraint failed: users.email" in response.json()["detail"]
+
+
+@pytest.mark.anyio
+async def test_update_user_422_email_invalid(
+    async_client: AsyncClient, created_user_token: tuple
+):
+    # Creating a 'testuser' and a token for a 'testuser'
+    user, token = created_user_token
+
+    # Getting the logged in user data
+    response = await async_client.get(
+        "/user/check/testuser", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 200
+    original_user = response.json()
+    assert user["username"] in original_user["username"]
+    assert original_user["email"] == "test@example.com"
+
+    # Calling the update_user endpoint for 'testuser' with already taken email
+    payload = {
+        "email": "invalid_mail",
+        "first_name": "John",
+        "last_name": "Doe",
+    }
+    response = await async_client.patch(
+        "/user/update", json=payload, headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 422
+    assert "The email address is not valid" in response.text
+
+
+@pytest.mark.anyio
+async def test_delete_user_204(async_client: AsyncClient, created_user_token: tuple):
+    # Creating a 'testuser' and a token for a 'testuser'
+    testuser, testuser_token = created_user_token
+
+    # Creating 'admin_user' and token for an 'admin_user'
+    admin_token = create_user_and_token(
+        username="admin_user",
+        email="admin@example.com",
+        password="password",
+        role="admin",
+    )
+
+    # Veryfying if the 'testuser' can be found in db with authentication of 'admin_user'
+    response = await async_client.get(
+        "/user/check/testuser", headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    assert response.status_code == 200
+    assert testuser["username"] == response.json()["username"]
+
+    # Calling delete_user endpoint by 'testuser' (deleting 'testuser')
+    response = await async_client.delete(
+        "/user/delete", headers={"Authorization": f"Bearer {testuser_token}"}
+    )
+    assert response.status_code == 204
+
+    # Veryfying if the deleted user can be found in db with authentication of 'admin_user'
+    response = await async_client.get(
+        "/user/check/testuser", headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    assert response.status_code == 404
+    assert "User 'testuser' not found in the database." in response.json()["detail"]
+
+
+@pytest.mark.anyio
+async def test_delete_user_401_if_not_authenticated(async_client: AsyncClient):
+    # Calling the delete_user endpoint
+    response = await async_client.delete("/user/delete")
+    assert response.status_code == 401
+    assert "Not authenticated" in response.content.decode()
+
+
+@pytest.mark.anyio
+async def test_change_password_204(
+    created_user_token: tuple, async_client: AsyncClient
+):
+    # Creating a 'testuser' and a token for a 'testuser'
+    user, token = created_user_token
+
+    # Calling change_password endpoint with new password
+    payload = {
+        "current_password": "testpass123",
+        "new_password": "password",
+        "confirm_password": "password",
+    }
+    response = await async_client.put(
+        "/user/password", json=payload, headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 204
+
+    # Check if the password has been changed in the database
+    with TestingSessionLocal() as db:
+        # Get the user from the database
+        user = db.query(Users).filter(Users.id == user["id"]).first()
+        assert user is not None
+
+        # Verify that the new password matches
+        assert bcrypt_context.verify(payload["new_password"], user.hashed_password)
+
+
+@pytest.mark.anyio
+async def test_change_password_401_if_not_authenticated(async_client: AsyncClient):
+    # Calling the change_password endpoint
+    payload = {
+        "current_password": "testpass123",
+        "new_password": "password",
+        "confirm_password": "password",
+    }
+    response = await async_client.put("/user/password", json=payload)
+    assert response.status_code == 401
+    assert "Not authenticated" in response.content.decode()
+
+
+@pytest.mark.anyio
+async def test_change_password_401_if_invalid_current_password(
+    created_user_token: tuple, async_client: AsyncClient
+):
+    # Creating a 'testuser' and a token for a 'testuser'
+    user, token = created_user_token
+
+    # Calling change_password endpoint with incorrect old password
+    payload = {
+        "current_password": "incorrect_password",
+        "new_password": "password",
+        "confirm_password": "password",
+    }
+    response = await async_client.put(
+        "/user/password", json=payload, headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 401
+    assert (
+        "Failed Authentication - incorrect current password"
+        in response.json()["detail"]
+    )
+
+
+@pytest.mark.anyio
+async def test_change_password_400_if_passwords_not_match(
+    created_user_token: tuple, async_client: AsyncClient
+):
+    # Creating a 'testuser' and a token for a 'testuser'
+    user, token = created_user_token
+
+    # Calling change_password endpoint with new passwords (unmatch)
+    payload = {
+        "current_password": "testpass123",
+        "new_password": "password_111",
+        "confirm_password": "password_999",
+    }
+    response = await async_client.put(
+        "/user/password", json=payload, headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 400
+    assert "Passwords do not match" in response.json()["detail"]

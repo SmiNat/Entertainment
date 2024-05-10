@@ -30,7 +30,6 @@ engine = create_engine(
 )
 
 Base.metadata.drop_all(bind=engine)
-# Base.metadata.drop_all(bind=engine, tables=[Users.__table__], checkfirst=True)
 Base.metadata.create_all(bind=engine)
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -146,6 +145,12 @@ def mock_authorisation(
         }
 
 
+def create_user_and_token(username: str, email: str, password: str, role: str = "user"):
+    user = create_db_user(username, email, password, role)
+    token = create_access_token(user.username, user.id, user.role)
+    return token
+
+
 def check_if_db_users_table_is_empty():
     db = TestingSessionLocal()
     db_content = db.query(Users).all()
@@ -160,30 +165,24 @@ def check_if_db_users_table_is_empty():
         raise DatabaseNotEmptyError("Users table not empty.")
 
 
-def create_user_and_token(username: str, email: str, password: str, role: str = "user"):
-    user = create_db_user(username, email, password, role)
-    token = create_access_token(user.username, user.id, user.role)
-    return token
-
-
 # Some app fixtures to use in tests
 @pytest.fixture
-def created_user():
+def created_admin_user() -> Users:
     db = TestingSessionLocal()
     try:
-        new_user = Users(
-            username="testuser",
-            email="test@example.com",
-            hashed_password="password",
-            role="user",
+        admin_user = Users(
+            username="adminuser",
+            email="admin@example.com",
+            hashed_password="#password",
+            role="admin",
             is_active=True,
             first_name=None,
             last_name=None,
         )
-        db.add(new_user)
+        db.add(admin_user)
         db.commit()
-        db.refresh(new_user)
-        return new_user
+        db.refresh(admin_user)
+        return admin_user
     finally:
         db.close()
 
@@ -195,21 +194,19 @@ async def registered_user(async_client: AsyncClient) -> dict:
         "email": "test@example.com",
         # "first_name": None,
         # "last_name": None,
-        # "role": "user",
         "password": "testpass123",
         "confirm_password": "testpass123",
     }
     user = await async_client.post("/user/register", json=payload)
-    # user = async_client.post("/user", params="testuser")
     return user.json()
 
 
 @pytest.fixture
-async def created_user_token(async_client, registered_user) -> str:
+async def created_user_token(registered_user) -> tuple:
     user = registered_user
     token = create_access_token(
         username=user["username"],
         user_id=user["id"],
         role=user["role"],
     )
-    return token
+    return user, token
