@@ -62,7 +62,6 @@ class ChangePassword(BaseModel):
 
 
 @router.get("/current")
-# async def get_logged_in_user(current_user: User = Depends(get_current_user)):
 async def get_logged_in_user(current_user: user_dependency):
     return current_user
 
@@ -161,9 +160,7 @@ async def delete_user(db: db_dependency, user: user_dependency) -> None:
     db.query(Users).filter(Users.id == user["id"]).delete()
     db.commit()
 
-    logger.debug(
-        "Delete user - successfully deleted a user '%s'." % authenticated_user.username
-    )
+    logger.debug("User successfully deleted.")
 
 
 @router.put("/password", status_code=status.HTTP_204_NO_CONTENT)

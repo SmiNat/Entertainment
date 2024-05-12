@@ -31,12 +31,12 @@ def check_date(date_value: str, format: str = "%Y-%m-%d") -> None:
     except ValueError:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            detail="Invalid date type. Enter date in YYYY-MM-DD " "format.",
+            detail="Invalid date type. Enter date in 'YYYY-MM-DD' format.",
         )
 
 
 async def check_genre(db: Session, genres: list[str]):
-    accessible_genres = get_movies_genre(db)
+    accessible_genres = await get_movies_genres(db)
     for genre in genres:
         if genre.lower() in accessible_genres:
             continue
@@ -80,7 +80,7 @@ class UserDataRequest(BaseModel):
 
 
 @router.get("/genres", status_code=200, description="Get all available movie genres.")
-def get_movies_genre(db: db_dependency) -> list:
+async def get_movies_genres(db: db_dependency) -> list:
     query = select(Movies.genres).distinct()
     genres = db.execute(query).scalars().all()
     unique_genres = set()

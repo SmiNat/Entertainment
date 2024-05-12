@@ -5,16 +5,16 @@ from typing import AsyncGenerator, Generator
 import pytest
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
-from sqlalchemy import MetaData, create_engine, text  # noqa
-from sqlalchemy.orm import declarative_base, sessionmaker  # noqa
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
 os.environ["ENV_STATE"] = "test"
 
 from entertainment.config import config  # noqa: E402
-from entertainment.database import Base, get_db  # noqa
+from entertainment.database import Base, get_db  # noqa: E402
 from entertainment.exceptions import DatabaseNotEmptyError  # noqa: E402
 from entertainment.main import app  # noqa: E402
-from entertainment.models import Movies, Users  # noqa
+from entertainment.models import Users  # noqa: E402
 from entertainment.routers.auth import (  # noqa: E402
     create_access_token,
     get_current_user,
@@ -54,6 +54,7 @@ def clean_db():
     """Cleans db session for each test."""
     db = TestingSessionLocal()
     db.execute(text("DELETE FROM users"))
+    db.execute(text("DELETE FROM movies"))
     db.commit()
     db.close()
 
@@ -202,11 +203,17 @@ async def registered_user(async_client: AsyncClient) -> dict:
 
 
 @pytest.fixture
-async def created_user_token(registered_user) -> tuple:
-    user = registered_user
+async def created_token(registered_user) -> str:
     token = create_access_token(
-        username=user["username"],
-        user_id=user["id"],
-        role=user["role"],
+        username=registered_user["username"],
+        user_id=registered_user["id"],
+        role=registered_user["role"],
     )
+    return token
+
+
+@pytest.fixture
+async def created_user_token(registered_user, created_token) -> tuple:
+    user = registered_user
+    token = created_token
     return user, token
