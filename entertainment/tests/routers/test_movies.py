@@ -1,5 +1,4 @@
 import logging
-from unittest.mock import patch
 
 import pytest
 from fastapi import HTTPException
@@ -21,8 +20,7 @@ from entertainment.tests.utils_movies import (
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.anyio
-async def test_check_date():
+def test_check_date():
     invalid_date = "20-10-2020"
     # Example test case where date is invalid
     check_date("2020-10-20")
@@ -36,37 +34,18 @@ async def test_check_date():
     assert exc_info.value.status_code == 400
 
 
-@pytest.mark.anyio
-async def test_check_genre():
-    # Mocking get_movies_genres endpoint
-    expected_genres = ["action", "comedy", "romance", "war"]
-    with patch(
-        "entertainment.routers.movies.get_movies_genres"
-    ) as mock_get_movies_genres:
-        mock_get_movies_genres.return_value = expected_genres
-        logger.debug("\nTEST - Mock called with: %s" % mock_get_movies_genres.call_args)
-        logger.debug(
-            "\nTEST - Mock return value: %s" % mock_get_movies_genres.return_value
-        )
+def test_check_genre():
+    # Example test case where genres are valid
+    check_genre(["action", "comedy"])
 
-        db_session_generator = override_get_db()
-        db_session = next(db_session_generator)
-
-        # Example test case where genres are valid
-        await check_genre(db_session, ["action", "comedy"])
-        # Ensure that get_movies_genres was awaited correctly
-        mock_get_movies_genres.assert_awaited_once_with(db_session)
-
-        # Example test case where genres are invalid
-        with pytest.raises(HTTPException) as exc_info:
-            await check_genre(db_session, ["romance", "history"])
-        assert exc_info.value.status_code == 403
-        assert (
-            "Invalid genre (check 'get movies genre' for list of accessible genres)"
-            in exc_info.value.detail
-        )
-        # Ensure that get_movies_genres was awaited correctly
-        mock_get_movies_genres.assert_awaited_with(db_session)
+    # Example test case where genres are invalid
+    with pytest.raises(HTTPException) as exc_info:
+        check_genre(["romance", "history", "statistics"])
+    assert exc_info.value.status_code == 403
+    assert (
+        "Invalid genre (check 'get movies genres' for list of accessible genres)"
+        in exc_info.value.detail
+    )
 
 
 @pytest.mark.anyio
@@ -291,14 +270,14 @@ async def test_add_movie_201(
     # Veryfying if the db movies table is not empty
     assert check_if_db_movies_table_is_not_empty() is True
 
-    # Veryfying if the db record has correct value of updated_by field
+    # Veryfying if the db record has correct value of created_by_by field
     db_record = (
         TestingSessionLocal()
         .query(Movies)
         .filter(Movies.title == payload["title"])
         .first()
     )
-    assert db_record.updated_by == user["username"]
+    assert db_record.created_by == user["username"]
 
 
 @pytest.mark.anyio
@@ -348,6 +327,30 @@ async def test_add_movie_403_invalid_genre(
     )
     assert response.status_code == 403
     assert (
-        "Invalid genre (check 'get movies genre' for list of accessible genres)"
+        "Invalid genre (check 'get movies genres' for list of accessible genres)"
         in response.json()["detail"]
     )
+
+
+@pytest.mark.anyio
+async def test_update_movie_202(
+    async_client: AsyncClient,
+    added_movie: dict,
+    created_user_token: tuple,
+):
+    movie = added_movie
+    assert movie["updated_by"] is None
+    assert movie["score"] == 6.2
+    assert movie["orig_title"] == "Nigdy w życiu!"
+
+    user, token = created_user_token
+    payload = {"score": 9.9, "orig_title": "Never, ever!"}
+
+    response = await async_client.patch(
+        "/movies/update/Nigdy w życiu!/2004-02-13",
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 202
+    assert response.json()["score"] == payload["score"]
+    assert response.json()["updated_by"] == user["username"]

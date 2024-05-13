@@ -4,6 +4,7 @@ from typing import AsyncGenerator, Generator
 from unittest.mock import patch
 
 import pytest
+from fastapi.encoders import jsonable_encoder
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine, text
@@ -15,7 +16,7 @@ from entertainment.config import config  # noqa: E402
 from entertainment.database import Base, get_db  # noqa: E402
 from entertainment.enums import MovieGenres  # noqa: E402
 from entertainment.main import app  # noqa: E402
-from entertainment.models import Users  # noqa: E402
+from entertainment.models import Movies, Users  # noqa: E402
 from entertainment.routers.auth import create_access_token  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -172,4 +173,10 @@ async def added_movie(
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
-    return response.json()
+    movie = (
+        TestingSessionLocal()
+        .query(Movies)
+        .filter(Movies.title == "Nigdy w życiu!")
+        .first()
+    )
+    return jsonable_encoder(movie)
