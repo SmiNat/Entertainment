@@ -45,7 +45,7 @@ class GetUser(User):
     create_timestamp: datetime.datetime
     update_timestamp: datetime.datetime
 
-    class Config:
+    class ConfigDict:
         from_attributes = True
 
 
@@ -56,9 +56,9 @@ class UpdateUser(BaseModel):
 
 
 class ChangePassword(BaseModel):
-    current_password: str = Field(format="password")
-    new_password: str = Field(min_length=8, format="password")
-    confirm_password: str = Field(min_length=8, format="password")
+    current_password: str = Field(examples=["old_password"])
+    new_password: str = Field(min_length=8, examples=["password"])
+    confirm_password: str = Field(min_length=8, examples=["password"])
 
 
 @router.get("/current")

@@ -60,7 +60,7 @@ class MoviesRequest(BaseModel):
     revenue: float | None = Field(default=None, ge=0, examples=[None])
     country: str | None = Field(default=None, max_length=3, examples=[None])
 
-    class Config:
+    class ConfigDict:
         from_attributes = True
 
 
