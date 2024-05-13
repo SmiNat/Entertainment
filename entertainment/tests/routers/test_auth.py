@@ -1,3 +1,4 @@
+import logging
 import os
 
 import pytest
@@ -13,10 +14,6 @@ from entertainment.routers.auth import (
     get_current_user,
 )
 from entertainment.tests.conftest import TestingSessionLocal
-
-os.environ["ENV_STATE"] = "test"
-
-import logging  # noqa
 
 logger = logging.getLogger(__name__)
 

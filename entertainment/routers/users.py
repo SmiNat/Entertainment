@@ -45,7 +45,7 @@ class GetUser(User):
     create_timestamp: datetime.datetime
     update_timestamp: datetime.datetime
 
-    class Config:
+    class ConfigDict:
         from_attributes = True
 
 
@@ -56,13 +56,12 @@ class UpdateUser(BaseModel):
 
 
 class ChangePassword(BaseModel):
-    current_password: str = Field(format="password")
-    new_password: str = Field(min_length=8, format="password")
-    confirm_password: str = Field(min_length=8, format="password")
+    current_password: str = Field(examples=["old_password"])
+    new_password: str = Field(min_length=8, examples=["password"])
+    confirm_password: str = Field(min_length=8, examples=["password"])
 
 
 @router.get("/current")
-# async def get_logged_in_user(current_user: User = Depends(get_current_user)):
 async def get_logged_in_user(current_user: user_dependency):
     return current_user
 
@@ -90,7 +89,7 @@ async def get_user(username: str, db: db_dependency, user: user_dependency):
                 status.HTTP_403_FORBIDDEN,
                 "Permission denied. Access to see other users' data is restricted.",
             )
-    logger.debug("Get user - successfully returned a user '%s'." % username)
+    logger.debug("GET user - successfully returned a user '%s'." % username)
     return requested_user
 
 
@@ -123,7 +122,7 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> dict:
         )
 
     logger.debug(
-        "Post on create user - successfully added a user '%s'." % user_model.username
+        "POST on create user - successfully added a user '%s'." % user_model.username
     )
     return user_model
 
@@ -146,7 +145,7 @@ async def update_user(
         )
 
     logger.debug(
-        "Patch on update user - successfully updated a user '%s'."
+        "PATCH on update user - successfully updated a user '%s'."
         % authenticated_user.username
     )
 
@@ -161,9 +160,7 @@ async def delete_user(db: db_dependency, user: user_dependency) -> None:
     db.query(Users).filter(Users.id == user["id"]).delete()
     db.commit()
 
-    logger.debug(
-        "Delete user - successfully deleted a user '%s'." % authenticated_user.username
-    )
+    logger.debug("User successfully deleted.")
 
 
 @router.put("/password", status_code=status.HTTP_204_NO_CONTENT)
@@ -191,6 +188,6 @@ async def change_password(
     db.refresh(authenticated_user)
 
     logger.debug(
-        "Put on change password - successfully changed password for a user '%s'."
+        "PUT on change password - successfully changed password for a user '%s'."
         % authenticated_user.username
     )

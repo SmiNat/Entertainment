@@ -1,31 +1,15 @@
-import os
+import logging
 
 import pytest
 from httpx import AsyncClient
 
-from entertainment.database import get_db  # noqa
-from entertainment.main import app  # noqa
-from entertainment.models import Users  # noqa
-from entertainment.routers.auth import (  # noqa
-    authenticate_user,
-    bcrypt_context,
-    create_access_token,
-    get_current_user,
-)
-from entertainment.routers.users import get_logged_in_user  # noqa
-from entertainment.tests.conftest import (  # noqa
-    TestingSessionLocal,
-    check_if_db_users_table_is_empty,
-    create_db_user,
-    create_user_and_token,
-    mock_authorisation,
-)
-
-os.environ["ENV_STATE"] = "test"
-
-import logging  # noqa
+from entertainment.models import Users
+from entertainment.routers.auth import bcrypt_context
+from entertainment.tests.conftest import TestingSessionLocal
+from entertainment.tests.utils_users import create_user_and_token
 
 logger = logging.getLogger(__name__)
+
 
 COMMEND = "pytest --disable-warnings --log-cli-level=DEBUG -s"
 

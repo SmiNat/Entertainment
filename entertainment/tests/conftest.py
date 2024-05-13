@@ -1,26 +1,25 @@
 import logging
 import os
 from typing import AsyncGenerator, Generator
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
-from httpx import AsyncClient
-from sqlalchemy import MetaData, create_engine, text  # noqa
-from sqlalchemy.orm import declarative_base, sessionmaker  # noqa
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
 os.environ["ENV_STATE"] = "test"
 
 from entertainment.config import config  # noqa: E402
-from entertainment.database import Base, get_db  # noqa
-from entertainment.exceptions import DatabaseNotEmptyError  # noqa: E402
+from entertainment.database import Base, get_db  # noqa: E402
+from entertainment.enums import MovieGenres  # noqa: E402
 from entertainment.main import app  # noqa: E402
-from entertainment.models import Movies, Users  # noqa
-from entertainment.routers.auth import (  # noqa: E402
-    create_access_token,
-    get_current_user,
-)
+from entertainment.models import Users  # noqa: E402
+from entertainment.routers.auth import create_access_token  # noqa: E402
 
 logger = logging.getLogger(__name__)
+
 
 # Creating test.db database instead of using application db (entertainment.db)
 engine = create_engine(
@@ -54,6 +53,7 @@ def clean_db():
     """Cleans db session for each test."""
     db = TestingSessionLocal()
     db.execute(text("DELETE FROM users"))
+    db.execute(text("DELETE FROM movies"))
     db.commit()
     db.close()
 
@@ -79,90 +79,10 @@ def client() -> Generator:
 @pytest.fixture
 async def async_client(client) -> AsyncGenerator:
     """Uses async client from httpx instead of test client from fastapi for async tests."""
-    async with AsyncClient(app=app, base_url=client.base_url) as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url=client.base_url
+    ) as ac:
         yield ac
-
-
-# Some helpful functions to use in tests
-def create_db_user(
-    username: str = "testuser",
-    email: str = "test@example.com",
-    hashed_password: str = "password",
-    role: str = "user",
-    is_active: bool = True,
-    first_name: str | None = None,
-    last_name: str | None = None,
-):
-    db = TestingSessionLocal()
-    try:
-        new_user = Users(
-            username=username,
-            email=email,
-            hashed_password=hashed_password,
-            role=role,
-            is_active=is_active,
-            first_name=first_name,
-            last_name=last_name,
-        )
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-        return new_user
-    finally:
-        db.close()
-
-
-def mock_authorisation(
-    user: Users | dict = None, username: str = None, id: int = None, role: str = "user"
-):
-    if isinstance(user, Users):
-        app.dependency_overrides[get_current_user] = lambda: {
-            "username": user.username,
-            "id": user.id,
-            "role": user.role,
-        }
-    elif isinstance(user, dict):
-        app.dependency_overrides[get_current_user] = lambda: {
-            "username": user["username"],
-            "id": user["id"],
-            "role": user["role"],
-        }
-    elif user and not isinstance(user, (Users, dict)):
-        raise AttributeError(
-            "'user' parameter must be of Users instance or a dictionary, not {}.".format(
-                type(user)
-            )
-        )
-    if not user:
-        if not username or not id:
-            raise AttributeError(
-                "Either 'user' parameter is required or parameters: 'username' and 'id'."
-            )
-        app.dependency_overrides[get_current_user] = lambda: {
-            "username": username,
-            "id": id,
-            "role": role,
-        }
-
-
-def create_user_and_token(username: str, email: str, password: str, role: str = "user"):
-    user = create_db_user(username, email, password, role)
-    token = create_access_token(user.username, user.id, user.role)
-    return token
-
-
-def check_if_db_users_table_is_empty():
-    db = TestingSessionLocal()
-    db_content = db.query(Users).all()
-    if db_content:
-        logger.warning(
-            "Database warning: not empty Users table; %s"
-            % [
-                {"username": element.username, "id": element.id, "role": element.role}
-                for element in db_content
-            ]
-        )
-        raise DatabaseNotEmptyError("Users table not empty.")
 
 
 # Some app fixtures to use in tests
@@ -202,11 +122,54 @@ async def registered_user(async_client: AsyncClient) -> dict:
 
 
 @pytest.fixture
-async def created_user_token(registered_user) -> tuple:
-    user = registered_user
+async def created_token(registered_user) -> str:
     token = create_access_token(
-        username=user["username"],
-        user_id=user["id"],
-        role=user["role"],
+        username=registered_user["username"],
+        user_id=registered_user["id"],
+        role=registered_user["role"],
     )
+    return token
+
+
+@pytest.fixture
+async def created_user_token(registered_user, created_token) -> tuple:
+    user = registered_user
+    token = created_token
     return user, token
+
+
+@pytest.fixture
+def mock_get_movies_genres():
+    with patch(
+        "entertainment.routers.movies.get_movies_genres"
+    ) as mock_get_movies_genres:
+        mock_get_movies_genres.return_value = list(
+            map(lambda genre: genre.value, MovieGenres)
+        )
+        yield mock_get_movies_genres
+
+
+@pytest.fixture()
+async def added_movie(
+    async_client: AsyncClient, created_token: str, mock_get_movies_genres
+) -> dict:
+    """Creates movie record in the database before running a test."""
+    payload = {
+        "title": "Nigdy w życiu!",
+        "premiere": "2004-02-13",
+        "score": 6.2,
+        "genres": ["comedy", "romance"],
+        "overview": "Judyta po rozwodzie zaczyna budowę domu pod Warszawą i znajduje nową miłość.",
+        "crew": "Danuta Stenka, Judyta Kozłowska, Joanna Brodzik, Ula, Artur Żmijewski, Adam, Jan Frycz, Tomasz Kozłowski",
+        "orig_title": "Nigdy w życiu!",
+        "orig_lang": "Polish",
+        "budget": None,
+        "revenue": None,
+        "country": "PL",
+    }
+    response = await async_client.post(
+        "/movies/add",
+        json=payload,
+        headers={"Authorization": f"Bearer {created_token}"},
+    )
+    return response.json()

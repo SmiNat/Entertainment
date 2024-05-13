@@ -31,12 +31,12 @@ def check_date(date_value: str, format: str = "%Y-%m-%d") -> None:
     except ValueError:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
-            detail="Invalid date type. Enter date in YYYY-MM-DD " "format.",
+            detail="Invalid date type. Enter date in 'YYYY-MM-DD' format.",
         )
 
 
 async def check_genre(db: Session, genres: list[str]):
-    accessible_genres = get_movies_genre(db)
+    accessible_genres = await get_movies_genres(db)
     for genre in genres:
         if genre.lower() in accessible_genres:
             continue
@@ -50,7 +50,7 @@ async def check_genre(db: Session, genres: list[str]):
 class MoviesRequest(BaseModel):
     title: str
     premiere: datetime.date = Field(description="YYYY-MM-DD format.")
-    score: float = Field(default=0, ge=0, le=1000)
+    score: float = Field(default=0, ge=0, le=10, description="IMDB score.")
     genres: list[str] = Field(max_length=500)
     overview: str | None = Field(max_length=500, examples=[None])
     crew: str | None = Field(max_length=500, examples=[None])
@@ -59,6 +59,9 @@ class MoviesRequest(BaseModel):
     budget: float | None = Field(default=None, ge=0, examples=[None])
     revenue: float | None = Field(default=None, ge=0, examples=[None])
     country: str | None = Field(default=None, max_length=3, examples=[None])
+
+    class ConfigDict:
+        from_attributes = True
 
 
 class MoviesResponse(MoviesRequest):
@@ -80,7 +83,7 @@ class UserDataRequest(BaseModel):
 
 
 @router.get("/genres", status_code=200, description="Get all available movie genres.")
-def get_movies_genre(db: db_dependency) -> list:
+async def get_movies_genres(db: db_dependency) -> list:
     query = select(Movies.genres).distinct()
     genres = db.execute(query).scalars().all()
     unique_genres = set()
@@ -94,7 +97,7 @@ def get_movies_genre(db: db_dependency) -> list:
                     genre = str(genre).strip()
                     unique_genres.add(genre.lower())
     logger.debug(
-        "Get movie genres - number of available movie genres: %s." % len(unique_genres)
+        "GET movies genres - number of available movie genres: %s." % len(unique_genres)
     )
     return sorted(unique_genres)
 
@@ -115,7 +118,7 @@ async def get_all_movies(
     if movie_model is None:
         raise HTTPException(status_code=404, detail="Movies not found.")
 
-    logger.debug("Get all movies - database hits: %s records." % len(movie_model))
+    logger.debug("GET all movies - database hits: %s records." % len(movie_model))
 
     start_index = (page - 1) * page_size
     end_index = start_index + page_size
@@ -152,24 +155,24 @@ async def search_movies(
         Movies.premiere >= premiere_since,
         Movies.premiere <= premiere_before,
         Movies.score >= score_ge,
-        Movies.title.contains(title),
+        Movies.title.icontains(title),
     )
 
     if crew is not None:
-        query = query.filter(Movies.crew.contains(crew))
+        query = query.filter(Movies.crew.icontains(crew))
     if genre_primary is not None:
-        query = query.filter(Movies.genres.contains(genre_primary))
+        query = query.filter(Movies.genres.icontains(genre_primary))
     if genre_secondary is not None:
-        query = query.filter(Movies.genres.contains(genre_secondary))
+        query = query.filter(Movies.genres.icontains(genre_secondary))
     if country is not None:
-        query = query.filter(Movies.country.contains(country))
+        query = query.filter(Movies.country.icontains(country))
     if language is not None:
-        query = query.filter(Movies.orig_lang.contains(language))
+        query = query.filter(Movies.orig_lang.icontains(language))
 
     if query is None:
         raise HTTPException(status_code=404, detail="Movie not found.")
 
-    logger.debug("Get on search movies - database hits: %s." % len(query.all()))
+    logger.debug("GET search movies - database hits: %s." % len(query.all()))
 
     results = query.offset((page - 1) * 10).limit(10).all()
     return {"number of movies": len(query.all()), "movies": results}
@@ -214,7 +217,7 @@ async def add_movie(
     db.commit()
 
     logger.debug(
-        "Post on add movie: '%s' successfully added to database." % movie_model.title
+        "POST on add movie: '%s' successfully added to database." % movie_model.title
     )
 
 
