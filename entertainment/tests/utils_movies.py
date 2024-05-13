@@ -43,13 +43,13 @@ def create_movie(
     title: str | None = "Test Movie",
     premiere: str | None = "2011-11-11",  # ISO 8601 formatted string
     score: float | None = 8.5,
-    genres: list[str] | None = ["Action", "war"],
-    overview: str | None = "Test overview",
+    genres: list[str] | None = ["Action"],
+    overview: str | None = None,
     crew: str | None = "Test crew",
-    orig_title: str | None = "Original Title",
+    orig_title: str | None = None,
     orig_lang: str | None = "English",
-    budget: int | float | None = 1000000,
-    revenue: int | float | None = 2000000,
+    budget: int | float | None = None,
+    revenue: int | float | None = None,
     country: str | None = "US",
     created_by: str | None = "John_Doe",
 ):
