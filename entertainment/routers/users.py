@@ -89,7 +89,7 @@ async def get_user(username: str, db: db_dependency, user: user_dependency):
                 status.HTTP_403_FORBIDDEN,
                 "Permission denied. Access to see other users' data is restricted.",
             )
-    logger.debug("Get user - successfully returned a user '%s'." % username)
+    logger.debug("GET user - successfully returned a user '%s'." % username)
     return requested_user
 
 
@@ -122,7 +122,7 @@ async def create_user(db: db_dependency, new_user: CreateUser) -> dict:
         )
 
     logger.debug(
-        "Post on create user - successfully added a user '%s'." % user_model.username
+        "POST on create user - successfully added a user '%s'." % user_model.username
     )
     return user_model
 
@@ -145,7 +145,7 @@ async def update_user(
         )
 
     logger.debug(
-        "Patch on update user - successfully updated a user '%s'."
+        "PATCH on update user - successfully updated a user '%s'."
         % authenticated_user.username
     )
 
@@ -188,6 +188,6 @@ async def change_password(
     db.refresh(authenticated_user)
 
     logger.debug(
-        "Put on change password - successfully changed password for a user '%s'."
+        "PUT on change password - successfully changed password for a user '%s'."
         % authenticated_user.username
     )

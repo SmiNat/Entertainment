@@ -1,6 +1,7 @@
 import logging
 import os
 from typing import AsyncGenerator, Generator
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,6 +13,7 @@ os.environ["ENV_STATE"] = "test"
 
 from entertainment.config import config  # noqa: E402
 from entertainment.database import Base, get_db  # noqa: E402
+from entertainment.enums import MovieGenres  # noqa: E402
 from entertainment.main import app  # noqa: E402
 from entertainment.models import Users  # noqa: E402
 from entertainment.routers.auth import create_access_token  # noqa: E402
@@ -134,3 +136,40 @@ async def created_user_token(registered_user, created_token) -> tuple:
     user = registered_user
     token = created_token
     return user, token
+
+
+@pytest.fixture
+def mock_get_movies_genres():
+    with patch(
+        "entertainment.routers.movies.get_movies_genres"
+    ) as mock_get_movies_genres:
+        mock_get_movies_genres.return_value = list(
+            map(lambda genre: genre.value, MovieGenres)
+        )
+        yield mock_get_movies_genres
+
+
+@pytest.fixture()
+async def added_movie(
+    async_client: AsyncClient, created_token: str, mock_get_movies_genres
+) -> dict:
+    """Creates movie record in the database before running a test."""
+    payload = {
+        "title": "Nigdy w życiu!",
+        "premiere": "2004-02-13",
+        "score": 6.2,
+        "genres": ["comedy", "romance"],
+        "overview": "Judyta po rozwodzie zaczyna budowę domu pod Warszawą i znajduje nową miłość.",
+        "crew": "Danuta Stenka, Judyta Kozłowska, Joanna Brodzik, Ula, Artur Żmijewski, Adam, Jan Frycz, Tomasz Kozłowski",
+        "orig_title": "Nigdy w życiu!",
+        "orig_lang": "Polish",
+        "budget": None,
+        "revenue": None,
+        "country": "PL",
+    }
+    response = await async_client.post(
+        "/movies/add",
+        json=payload,
+        headers={"Authorization": f"Bearer {created_token}"},
+    )
+    return response.json()

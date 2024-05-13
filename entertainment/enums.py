@@ -46,3 +46,25 @@ class FontType(str, Enum):
 
 class FontReset(str, Enum):
     SUFFIX = "\033[0m"
+
+
+class MovieGenres(str, Enum):
+    ACTION = "action"
+    ADVENTURE = "adventure"
+    ANIMATION = "animation"
+    COMEDY = "comedy"
+    CRIME = "crime"
+    DOCUMENTARY = "documentary"
+    DRAMA = "drama"
+    FAMILY = "family"
+    FANTASY = "fantasy"
+    HISTORY = "history"
+    HORROR = "horror"
+    MUSIC = "music"
+    MYSTERY = "mystery"
+    ROMANCE = "romance"
+    SCI_FI = "science fiction"
+    THRILLER = "thriller"
+    TV_MOVIE = "tv movie"
+    WAR = "war"
+    WESTERN = "western"
