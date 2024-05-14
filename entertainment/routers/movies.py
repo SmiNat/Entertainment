@@ -3,14 +3,18 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
-from sqlalchemy import Row, select
+from sqlalchemy import Row, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql._typing import _TP
 from starlette import status
 
 from entertainment.database import get_db
-from entertainment.models import Movies
+from entertainment.enums import MovieGenres
+from entertainment.exceptions import DatabaseError
+from entertainment.models import Movies, Users
 
 from .auth import get_current_user
 
@@ -35,25 +39,25 @@ def check_date(date_value: str, format: str = "%Y-%m-%d") -> None:
         )
 
 
-async def check_genre(db: Session, genres: list[str]):
-    accessible_genres = await get_movies_genres(db)
+def check_genre(genres: list[str]):
+    accessible_genres = list(map(lambda genre: genre.value, MovieGenres))
     for genre in genres:
         if genre.lower() in accessible_genres:
             continue
         else:
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN,
-                "Invalid genre (check 'get movies genre' for list of accessible genres).",
+                "Invalid genre (check 'get movies genres' for list of accessible genres).",
             )
 
 
-class MoviesRequest(BaseModel):
+class MovieRequest(BaseModel):
     title: str
     premiere: datetime.date = Field(description="YYYY-MM-DD format.")
     score: float = Field(default=0, ge=0, le=10, description="IMDB score.")
     genres: list[str] = Field(max_length=500)
-    overview: str | None = Field(max_length=500, examples=[None])
-    crew: str | None = Field(max_length=500, examples=[None])
+    overview: str | None = Field(default=None, max_length=500, examples=[None])
+    crew: str | None = Field(default=None, max_length=500, examples=[None])
     orig_title: str | None = Field(default=None, max_length=200, examples=[None])
     orig_lang: str | None = Field(default=None, max_length=30, examples=[None])
     budget: float | None = Field(default=None, ge=0, examples=[None])
@@ -64,10 +68,29 @@ class MoviesRequest(BaseModel):
         from_attributes = True
 
 
-class MoviesResponse(MoviesRequest):
+class MovieResponse(MovieRequest):
     id: int
     created_by: str
     updated_by: str
+
+    class ConfigDict:
+        from_attributes = True
+
+
+class UpdateMovieRequest(MovieRequest):
+    title: str | None = Field(default=None, examples=[None])
+    premiere: datetime.date | None = Field(
+        default=None, description="YYYY-MM-DD format.", examples=[None]
+    )
+    score: float | None = Field(
+        default=None, ge=0, le=10, description="IMDB score.", examples=[None]
+    )
+    genres: list[str | None] | None = Field(
+        default=None,
+        max_length=500,
+        examples=[[None, None]],
+        description="Provide genres as a list.",
+    )
 
 
 class UserDataRequest(BaseModel):
@@ -180,7 +203,7 @@ async def search_movies(
 
 @router.post("/add", status_code=status.HTTP_201_CREATED)
 async def add_movie(
-    db: db_dependency, user: user_dependency, movie_request: MoviesRequest
+    db: db_dependency, user: user_dependency, movie_request: MovieRequest
 ):
     if not user:
         raise HTTPException(
@@ -203,14 +226,10 @@ async def add_movie(
         )
 
     genre_list = movie_request.genres
-    await check_genre(db, genre_list)
+    check_genre(genre_list)
     genres = ", ".join(genre_list)
 
-    movie_model = Movies(
-        **movie_request.model_dump(),
-        created_by=user.get("username"),
-        updated_by=user.get("username"),
-    )
+    movie_model = Movies(**movie_request.model_dump(), created_by=user.get("username"))
     movie_model.genres = genres
 
     db.add(movie_model)
@@ -221,7 +240,90 @@ async def add_movie(
     )
 
 
-@router.patch("/update/{title}/{premiere}", status_code=204)
-async def update_movie():
-    # update either empty fields or own movie
-    pass
+@router.patch("/update/{title}/{premiere}", status_code=202)
+async def update_movie(
+    title: str,
+    premiere: str,
+    db: db_dependency,
+    user: user_dependency,
+    movie_update: UpdateMovieRequest,
+):
+    """Update movie - endpoint available for user who created a movie record or for an admin user."""
+    check_date(premiere)
+
+    # Movie to update
+    movie = (
+        db.query(Movies)
+        .filter(
+            Movies.premiere == premiere,
+            func.lower(Movies.title) == title.strip().casefold(),
+        )
+        .first()
+    )
+    logger.debug("Update movie: title='%s', premiere='%s" % (title, premiere))
+    logger.debug("Movie found: %s" % jsonable_encoder(movie))
+
+    if movie is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            f"Movie '{title}' ({premiere}) not found in the database.",
+        )
+
+    # Fields to update
+    updated_fields = movie_update.model_dump(exclude_unset=True, exclude_none=True)
+    logger.debug("Fields to update: %s" % updated_fields)
+
+    # Converting 'genres' field from a list to a string of valid (available) genres
+    if "genres" in updated_fields.keys():
+        # Removing None values from the genres list
+        genres = [item.strip() for item in updated_fields["genres"] if item]
+        if genres:
+            logger.debug("Genres: %s" % genres)
+            # Verifying if genres are on the list of available genres
+            check_genre(genres)
+            # Converting a list to a string
+            genres = ", ".join(genres)
+            logger.debug("Genres final: %s" % genres)
+        else:
+            del updated_fields["genres"]
+            logger.debug("Fields to update final: %s" % updated_fields)
+
+    if not updated_fields:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="No data input provided."
+        )
+
+    # Movie update available only for movie 'created_by' the authenticated_user
+    # or for admin user
+    authenticated_user = db.query(Users).filter(Users.id == user["id"]).first()
+
+    if not (
+        authenticated_user.role == "admin"
+        or authenticated_user.username == movie.created_by
+    ):
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            detail="Only admin or author of a movie record can update a movie.",
+        )
+    else:
+        try:
+            for field, value in updated_fields.items():
+                logger.debug("field, value: %s %s" % (field, value))
+                if field == "genres":
+                    setattr(movie, field, genres)
+                else:
+                    setattr(movie, field, value)
+            movie.updated_by = authenticated_user.username
+            db.commit()
+            db.refresh(movie)
+        except IntegrityError as e:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, detail=f"{DatabaseError(e._message())}"
+            )
+
+    logger.debug(
+        "Movie %s (%s) was successfully updated by the '%s' user."
+        % (title, premiere, authenticated_user.username)
+    )
+
+    return movie
