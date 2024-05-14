@@ -46,6 +46,7 @@ def execute_commands(commands: dict[str:str], connection: sqlite3.Connection) ->
 
 
 def switch_and_drop_table(table_from: str, table_to: str):
+    """Inserts data to funall tables and deletes temporary tables from database."""
     logger.debug(
         f"Inserting data from kaggle {table_from!r} table to {table_to!r} final table..."
     )
@@ -117,6 +118,9 @@ db_games_temp = {
         WHERE overall_review LIKE "1%" OR overall_review == "Free to play";
         """,
         "DELETE FROM games_temp WHERE title IS NULL;",
+        "DELETE FROM games_temp WHERE developer IS NULL;",
+        "DELETE FROM games_temp WHERE release_date IS NULL;",
+        "DELETE FROM games_temp WHERE genres IS NULL;",
         "DELETE FROM games_temp WHERE title LIKE '%???%';",
     ],
     "add columns": [
@@ -157,10 +161,6 @@ db_games_temp = {
         SET created_by = "www.kaggle.com - rahuldabholkar"
         WHERE created_by is NULL;
         """,
-        "UPDATE games_temp SET title = '---' WHERE title IS NULL;",
-        "UPDATE games_temp SET release_date = '---' WHERE release_date IS NULL;",
-        "UPDATE games_temp SET developer = '---' WHERE developer IS NULL;",
-        "UPDATE games_temp SET genres = '---' WHERE genres IS NULL;",
     ],
     "rename columns": [
         "ALTER TABLE games_temp RENAME COLUMN overall_review TO review_overall;",
@@ -179,9 +179,21 @@ db_games_temp = {
         (
         SELECT min(rowid)
         FROM games_temp
-        GROUP BY title, premiere, developer
+        GROUP BY lower(title), premiere, lower(developer)
         );
         """
+        # """
+        # DELETE FROM games_temp
+        # WHERE "index" NOT IN (
+        # SELECT "index"
+        # FROM (
+        #     SELECT "index",
+        #        ROW_NUMBER() OVER (PARTITION BY lower(title), premiere, lower(developer) ORDER BY reviews_number DESC) AS rn
+        #     FROM games
+        # ) AS t
+        # WHERE rn = 1
+        # );
+        # """
     ],
 }
 execute_commands(db_games_temp, conn)
@@ -206,7 +218,7 @@ create_table_query = """
         duration_ms         INTEGER,
         created_by          VARCHAR,
         updated_by          VARCHAR,
-        UNIQUE(title, artist, album_name)
+        UNIQUE(title, artist, album_name, duration_ms)
     );
 """
 create_table("songs", create_table_query, conn)
@@ -255,14 +267,26 @@ db_songs_temp = {
     ],
     "drop duplicate rows": [
         """
-        DELETE FROM  songs_temp
+        DELETE FROM songs_temp
         WHERE rowid NOT IN
         (
         SELECT min(rowid)
         FROM songs_temp
-        GROUP BY title, artist, album_name
+        GROUP BY lower(title), lower(artist), lower(album_name), duration_ms
         );
         """
+        # """
+        # DELETE FROM songs_temp
+        # WHERE "index" NOT IN (
+        #     SELECT "index"
+        #     FROM (
+        #         SELECT "index",
+        #             ROW_NUMBER() OVER (PARTITION BY lower(title), lower(artist), lower(album_name), duration_ms ORDER BY "index") AS rn
+        #         FROM songs
+        #     ) AS t
+        #     WHERE rn = 1
+        # );
+        # """
     ],
 }
 execute_commands(db_songs_temp, conn)
@@ -345,7 +369,7 @@ db_movies_temp = {
         (
         SELECT min(rowid)
         FROM movies_temp
-        GROUP BY title, premiere
+        GROUP BY lower(title), premiere
         );
         """
     ],
@@ -439,7 +463,7 @@ db_books_temp = {
         (
         SELECT min(rowid)
         FROM books_temp
-        GROUP BY title, author
+        GROUP BY lower(title), lower(author)
         );
         """
     ],

@@ -389,8 +389,29 @@ async def test_update_movie_422_incorrect_update_data(
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize(
+    "payload, error_info",
+    [
+        (
+            {"title": "Test Movie", "premiere": "2011-11-11"},
+            "the same title and premiere as already registered movie",
+        ),
+        (
+            {"title": "test movie", "premiere": "2011-11-11"},
+            "the same title (lowercase) and premiere as already registered movie",
+        ),
+        (
+            {"title": "test movie   ", "premiere": "2011-11-11"},
+            "the same title (withespaces) and premiere as already registered movie",
+        ),
+    ],
+)
 async def test_update_movie_400_not_unique_movie(
-    async_client: AsyncClient, added_movie: dict, created_token: str
+    async_client: AsyncClient,
+    added_movie: dict,
+    created_token: str,
+    payload: dict,
+    error_info: str,
 ):
     """Update cannot allow changes in title and premiere so that it could indicate
     to already existing movie in the database.
@@ -399,18 +420,13 @@ async def test_update_movie_400_not_unique_movie(
     create_movie()
     assert check_if_db_movies_table_is_not_empty() is True
 
-    payload = {
-        "title": "Test Movie",
-        "premiere": "2011-11-11",
-    }  # !!!!!!!!!!!!!!!!!!!!!!!!!!!
-
     response = await async_client.patch(
         "/movies/update/Nigdy w życiu!/2004-02-13",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 400
-    assert "UNIQUE constraint failed: movies.title, movies.premiere" in response.text
+    assert "UNIQUE constraint failed" in response.text
 
 
 @pytest.mark.anyio
