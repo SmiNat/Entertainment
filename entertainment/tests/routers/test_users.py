@@ -47,39 +47,49 @@ async def test_create_user_201_with_fixture(registered_user: dict):
 
 
 @pytest.mark.anyio
-async def test_create_user_400_with_not_unique_username(
-    async_client: AsyncClient, registered_user: dict
+@pytest.mark.parametrize(
+    "username, email, error_msg, comment",
+    [
+        (
+            "testuser",
+            "deadpool@example.com",
+            "A user with that username already exists",
+            "not unique username",
+        ),
+        (
+            "TestUser",
+            "deadpool@example.com",
+            "UNIQUE constraint failed: index 'idx_user_lowercased_username'",
+            "not unique username - index set on case sensitive uniqueness",
+        ),
+        (
+            "deadpool",
+            "test@example.com",
+            "A user with that email already exists",
+            "not unique email",
+        ),
+    ],
+)
+async def test_create_user_400_with_not_unique_data(
+    async_client: AsyncClient,
+    registered_user: dict,
+    username: str,
+    email: str,
+    error_msg: str,
+    comment: str,
 ):
     """Test creating a new user rejected if username already taken."""
-    user_in_db = registered_user
-    request_data = {
-        "username": user_in_db["username"],
-        "email": "deadpool@example.com",
+    # Calling the endpoint with invalid payload
+    payload = {
+        "username": username,
+        "email": email,
         "password": "deadpool123",
         "confirm_password": "deadpool123",
     }
-    response = await async_client.post("/user/register", json=request_data)
+    response = await async_client.post("/user/register", json=payload)
 
     assert response.status_code == 400
-    assert "A user with that username already exists" in response.json()["detail"]
-
-
-@pytest.mark.anyio
-async def test_create_user_400_with_not_unique_email(
-    async_client: AsyncClient, registered_user: dict
-):
-    """Test creating a new user rejected if email is already taken."""
-    user_in_db = registered_user
-    request_data = {
-        "username": "deadpool",
-        "email": user_in_db["email"],
-        "password": "deadpool123",
-        "confirm_password": "deadpool123",
-    }
-    response = await async_client.post("/user/register", json=request_data)
-
-    assert response.status_code == 400
-    assert "A user with that email already exists" in response.json()["detail"]
+    assert error_msg in response.json()["detail"]
 
 
 @pytest.mark.anyio
