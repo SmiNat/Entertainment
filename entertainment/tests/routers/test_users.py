@@ -148,7 +148,7 @@ async def test_get_user_with_other_username_200_with_admin_auth(
     testuser = registered_user
 
     # Creating 'admin_user' and token for an admin_user
-    admin_token = create_user_and_token(
+    admin_user, admin_token = create_user_and_token(
         username="admin_user",
         email="admin@example.com",
         password="password",
@@ -198,7 +198,7 @@ async def test_get_user_with_other_username_403_with_no_amin_auth(
     testuser = registered_user  # noqa
 
     # Creating 'no_admin_user' and a token for an no_admin_user
-    no_admin_token = create_user_and_token(
+    user, no_admin_token = create_user_and_token(
         username="simple_user",
         email="simple@example.com",
         password="password",
@@ -352,7 +352,7 @@ async def test_delete_user_204(async_client: AsyncClient, created_user_token: tu
     testuser, testuser_token = created_user_token
 
     # Creating 'admin_user' and token for an 'admin_user'
-    admin_token = create_user_and_token(
+    admin_user, admin_token = create_user_and_token(
         username="admin_user",
         email="admin@example.com",
         password="password",

@@ -168,7 +168,7 @@ async def added_movie(
         "revenue": None,
         "country": "PL",
     }
-    response = await async_client.post(
+    await async_client.post(
         "/movies/add",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},

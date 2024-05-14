@@ -293,14 +293,19 @@ async def update_movie(
             status.HTTP_400_BAD_REQUEST, detail="No data input provided."
         )
 
-    # Mmovie update available only for movie 'created_by' the authenticated_user
+    # Movie update available only for movie 'created_by' the authenticated_user
     # or for admin user
     authenticated_user = db.query(Users).filter(Users.id == user["id"]).first()
 
-    if (
+    if not (
         authenticated_user.role == "admin"
         or authenticated_user.username == movie.created_by
     ):
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            detail="Only admin or author of a movie record can update a movie.",
+        )
+    else:
         try:
             for field, value in updated_fields.items():
                 logger.debug("field, value: %s %s" % (field, value))

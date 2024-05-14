@@ -77,7 +77,7 @@ def mock_authorisation(
 def create_user_and_token(username: str, email: str, password: str, role: str = "user"):
     user = create_db_user(username, email, password, role)
     token = create_access_token(user.username, user.id, user.role)
-    return token
+    return user, token
 
 
 def check_if_db_users_table_is_empty():
