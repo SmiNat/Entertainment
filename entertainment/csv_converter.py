@@ -182,18 +182,6 @@ db_games_temp = {
         GROUP BY lower(title), premiere, lower(developer)
         );
         """
-        # """
-        # DELETE FROM games_temp
-        # WHERE "index" NOT IN (
-        # SELECT "index"
-        # FROM (
-        #     SELECT "index",
-        #        ROW_NUMBER() OVER (PARTITION BY lower(title), premiere, lower(developer) ORDER BY reviews_number DESC) AS rn
-        #     FROM games
-        # ) AS t
-        # WHERE rn = 1
-        # );
-        # """
     ],
 }
 execute_commands(db_games_temp, conn)
@@ -275,18 +263,6 @@ db_songs_temp = {
         GROUP BY lower(title), lower(artist), lower(album_name), duration_ms
         );
         """
-        # """
-        # DELETE FROM songs_temp
-        # WHERE "index" NOT IN (
-        #     SELECT "index"
-        #     FROM (
-        #         SELECT "index",
-        #             ROW_NUMBER() OVER (PARTITION BY lower(title), lower(artist), lower(album_name), duration_ms ORDER BY "index") AS rn
-        #         FROM songs
-        #     ) AS t
-        #     WHERE rn = 1
-        # );
-        # """
     ],
 }
 execute_commands(db_songs_temp, conn)
