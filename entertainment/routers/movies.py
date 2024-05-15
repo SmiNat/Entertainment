@@ -2,6 +2,7 @@ import datetime
 import logging
 from typing import Annotated
 
+import pycountry
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, Field
@@ -39,16 +40,33 @@ def check_date(date_value: str, format: str = "%Y-%m-%d") -> None:
         )
 
 
-def check_genre(genres: list[str]):
+def check_genres_list_and_convert_to_a_string(genres: list[str]):
     accessible_genres = list(map(lambda genre: genre.value, MovieGenres))
-    for genre in genres:
+    genres_list = [genre.strip().title() for genre in genres if genre]
+    for genre in genres_list:
         if genre.lower() in accessible_genres:
             continue
         else:
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN,
-                "Invalid genre (check 'get movies genres' for list of accessible genres).",
+                "Invalid genre: check 'get movies genres' for list of accessible genres.",
             )
+    genres_string = ", ".join(genres_list)
+    return genres_string
+
+
+def check_country_or_language(value: str, country: bool = True) -> dict | None:
+    """Returns ISO standards of a searched country (if country param is set to True) or
+    language (if country param is set to False)."""
+
+    try:
+        if country:
+            result = pycountry.countries.lookup(value)
+        else:
+            result = pycountry.languages.lookup(value)
+        return dict(result)
+    except LookupError:
+        return
 
 
 class MovieRequest(BaseModel):
@@ -225,9 +243,9 @@ async def add_movie(
             f"Movie '{movie_request.title}' is already registered in the database.",
         )
 
-    genre_list = movie_request.genres
-    check_genre(genre_list)
-    genres = ", ".join(genre_list)
+    genres_list = movie_request.genres
+    genres = check_genres_list_and_convert_to_a_string(genres_list)
+    # genres = ", ".join(genre_list)
 
     movie_model = Movies(**movie_request.model_dump(), created_by=user.get("username"))
     movie_model.genres = genres
@@ -252,6 +270,7 @@ async def update_movie(
     check_date(premiere)
 
     # Movie to update
+    logger.debug("Movie to update: title='%s', premiere='%s" % (title, premiere))
     movie = (
         db.query(Movies)
         .filter(
@@ -260,14 +279,12 @@ async def update_movie(
         )
         .first()
     )
-    logger.debug("Update movie: title='%s', premiere='%s" % (title, premiere))
-    logger.debug("Movie found: %s" % jsonable_encoder(movie))
-
     if movie is None:
         raise HTTPException(
             status.HTTP_404_NOT_FOUND,
             f"Movie '{title}' ({premiere}) not found in the database.",
         )
+    logger.debug("Movie found: %s" % jsonable_encoder(movie))
 
     # Fields to update
     updated_fields = movie_update.model_dump(exclude_unset=True, exclude_none=True)
@@ -275,18 +292,10 @@ async def update_movie(
 
     # Converting 'genres' field from a list to a string of valid (available) genres
     if "genres" in updated_fields.keys():
-        # Removing None values from the genres list
-        genres = [item.strip() for item in updated_fields["genres"] if item]
-        if genres:
-            logger.debug("Genres: %s" % genres)
-            # Verifying if genres are on the list of available genres
-            check_genre(genres)
-            # Converting a list to a string
-            genres = ", ".join(genres)
-            logger.debug("Genres final: %s" % genres)
-        else:
+        genres = check_genres_list_and_convert_to_a_string(updated_fields["genres"])
+        if not genres:
             del updated_fields["genres"]
-            logger.debug("Fields to update final: %s" % updated_fields)
+            logger.debug("Final fields to update: %s" % updated_fields)
 
     if not updated_fields:
         raise HTTPException(
@@ -305,24 +314,24 @@ async def update_movie(
             status.HTTP_401_UNAUTHORIZED,
             detail="Only admin or author of a movie record can update a movie.",
         )
-    else:
-        try:
-            for field, value in updated_fields.items():
-                logger.debug("field, value: %s %s" % (field, value))
-                if field == "genres":
-                    setattr(movie, field, genres)
-                else:
-                    setattr(movie, field, value)
-            movie.updated_by = authenticated_user.username
-            db.commit()
-            db.refresh(movie)
-        except IntegrityError as e:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST, detail=f"{DatabaseError(e._message())}"
-            )
+
+    try:
+        for field, value in updated_fields.items():
+            logger.debug("Updating: field: %s, value: %s" % (field, value))
+            if field == "genres":
+                setattr(movie, field, genres)
+            else:
+                setattr(movie, field, value)
+        movie.updated_by = authenticated_user.username
+        db.commit()
+        db.refresh(movie)
+    except IntegrityError as e:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail=f"{DatabaseError(e._message())}"
+        )
 
     logger.debug(
-        "Movie %s (%s) was successfully updated by the '%s' user."
+        "Movie '%s' (%s) was successfully updated by the '%s' user."
         % (title, premiere, authenticated_user.username)
     )
 

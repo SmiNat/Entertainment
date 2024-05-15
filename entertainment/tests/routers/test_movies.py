@@ -6,7 +6,10 @@ from fastapi.encoders import jsonable_encoder
 from httpx import AsyncClient
 
 from entertainment.models import Movies, Users  # noqa
-from entertainment.routers.movies import check_date, check_genre
+from entertainment.routers.movies import (
+    check_date,
+    check_genres_list_and_convert_to_a_string,
+)
 from entertainment.tests.conftest import (  # noqa
     TestingSessionLocal,
     override_get_db,
@@ -37,16 +40,16 @@ def test_check_date():
     assert exc_info.value.status_code == 400
 
 
-def test_check_genre():
+def test_check_genres_list_and_convert_to_a_string():
     # Example test case where genres are valid
-    check_genre(["action", "comedy"])
+    check_genres_list_and_convert_to_a_string(["action", "comedy"])
 
     # Example test case where genres are invalid
     with pytest.raises(HTTPException) as exc_info:
-        check_genre(["romance", "history", "statistics"])
+        check_genres_list_and_convert_to_a_string(["romance", "history", "statistics"])
     assert exc_info.value.status_code == 403
     assert (
-        "Invalid genre (check 'get movies genres' for list of accessible genres)"
+        "Invalid genre: check 'get movies genres' for list of accessible genres"
         in exc_info.value.detail
     )
 
@@ -331,7 +334,7 @@ async def test_add_movie_403_invalid_genre(
     )
     assert response.status_code == 403
     assert (
-        "Invalid genre (check 'get movies genres' for list of accessible genres)"
+        "Invalid genre: check 'get movies genres' for list of accessible genres"
         in response.json()["detail"]
     )
 
@@ -440,7 +443,7 @@ async def test_update_movie_400_not_unique_movie(
             403,
             ["invalid", "drama"],
             "incorrect",
-            "Invalid genre (check 'get movies genres' for list of accessible genres)",
+            "Invalid genre: check 'get movies genres' for list of accessible genres",
         ),
         (422, "invalid, drama", "incorrect", "Input should be a valid list"),
     ],

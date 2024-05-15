@@ -11,7 +11,6 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint,  # noqa
     func,
 )
 from sqlalchemy.orm import relationship
