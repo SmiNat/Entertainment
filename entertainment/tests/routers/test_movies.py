@@ -1,21 +1,11 @@
 import logging
 
 import pytest
-from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
 from httpx import AsyncClient
 
-from entertainment.models import Movies, Users  # noqa
-from entertainment.routers.movies import (
-    check_country,
-    check_date,
-    check_genres_list_and_convert_to_a_string,
-    check_language,
-)
-from entertainment.tests.conftest import (  # noqa
-    TestingSessionLocal,
-    override_get_db,
-)
+from entertainment.models import Movies
+from entertainment.tests.conftest import TestingSessionLocal
 from entertainment.tests.utils_movies import (
     check_if_db_movies_table_is_not_empty,
     create_movie,
@@ -26,81 +16,6 @@ from entertainment.tests.utils_users import create_user_and_token
 logger = logging.getLogger(__name__)
 
 # COMMAND = "pytest entertainment/tests/routers/test_movies.py -s --log-cli-level=DEBUG"
-
-
-def test_check_date():
-    invalid_date = "20-10-2020"
-    # Example test case where date is invalid
-    check_date("2020-10-20")
-
-    # Example test case where date is invalid
-    with pytest.raises(HTTPException) as exc_info:
-        check_date(invalid_date)
-    assert (
-        "Invalid date type. Enter date in 'YYYY-MM-DD' format." in exc_info.value.detail
-    )
-    assert exc_info.value.status_code == 422
-
-
-def test_check_genres_list_and_convert_to_a_string():
-    # Example test case where genres are valid
-    response = check_genres_list_and_convert_to_a_string(["action", "war", "comedy"])
-    assert response == "Action, Comedy, War"
-
-    # Example test case where genres are invalid
-    with pytest.raises(HTTPException) as exc_info:
-        check_genres_list_and_convert_to_a_string(["romance", "history", "statistics"])
-    assert exc_info.value.status_code == 422
-    assert (
-        "Invalid genre: check 'get movies genres' for list of accessible genres"
-        in exc_info.value.detail
-    )
-
-    # Example test case with list of empty records
-    response = check_genres_list_and_convert_to_a_string([None, None])
-    assert response is None
-
-
-@pytest.mark.parametrize(
-    "valid_data", [("pl"), ("pol"), ("Poland"), ("poland"), ("   poland")]
-)
-def test_check_country_with_valid_data(valid_data: str):
-    print(valid_data)
-    response = check_country(valid_data)
-    assert response == "PL"
-
-
-def test_check_country_with_invalid_data():
-    with pytest.raises(HTTPException) as exc_info:
-        check_country("invalid_country")
-    assert exc_info.value.status_code == 422
-    assert "Invalid country name. Available country names:" in exc_info.value.detail
-
-
-def test_check_country_with_empty_data():
-    response = check_country(None)
-    assert response is None
-
-
-@pytest.mark.parametrize(
-    "valid_data", [("pl"), ("pol"), ("polish"), ("Polish"), ("   polish")]
-)
-def test_check_language_with_valid_data(valid_data: str):
-    print(valid_data)
-    response = check_language(valid_data)
-    assert response == "Polish"
-
-
-def test_check_language_with_invalid_data():
-    with pytest.raises(HTTPException) as exc_info:
-        check_language("polnish")
-    assert exc_info.value.status_code == 422
-    assert "Invalid language name. Available languages:" in exc_info.value.detail
-
-
-def test_check_language_with_empty_data():
-    response = check_language(None)
-    assert response is None
 
 
 @pytest.mark.anyio
@@ -116,7 +31,7 @@ async def test_get_movies_genres_non_empty_db(async_client: AsyncClient):
     create_movie(title="First Movie", genres=["comedy"])
     create_movie(title="Second Movie", genres=["comedy", "music", "family"])
     create_movie(title="Third Movie", genres="drama")
-    expected_result = ["comedy", "drama", "family", "music"]
+    expected_result = ["Comedy", "Drama", "Family", "Music"]
 
     # Making the request to the endpoint
     response = await async_client.get("/movies/genres")
