@@ -45,10 +45,10 @@ class MovieRequest(BaseModel):
     overview: str | None = Field(default=None, max_length=500, examples=[None])
     crew: str | None = Field(default=None, max_length=500, examples=[None])
     orig_title: str | None = Field(
-        default=None, max_length=200, examples=[None], alias="original_title"
+        default=None, max_length=200, examples=[None], description="Original title."
     )
     orig_lang: str | None = Field(
-        default=None, max_length=30, examples=[None], alias="original_language"
+        default=None, max_length=30, examples=[None], description="Original language."
     )
     budget: float | None = Field(default=None, ge=0, examples=[None])
     revenue: float | None = Field(default=None, ge=0, examples=[None])
@@ -59,9 +59,10 @@ class MovieRequest(BaseModel):
 
 
 class MovieResponse(MovieRequest):
+    genres: str
     id: int
-    created_by: str
-    updated_by: str
+    created_by: str | None
+    updated_by: str | None
 
     class ConfigDict:
         from_attributes = True
@@ -113,16 +114,16 @@ async def get_movies_genres(db: db_dependency) -> list:
 async def get_all_movies(
     db: db_dependency,
     page_size: int = Query(10, ge=1, le=100),
-    page: int = Query(default=1, gt=0),
+    page_number: int = Query(default=1, gt=0),
 ) -> dict[str, list[Row[_TP]]]:
     movie_model = db.query(Movies).all()
 
-    if movie_model is None:
+    if not movie_model:
         raise HTTPException(status_code=404, detail="Movies not found.")
 
     logger.debug("Database hits (all movies): %s records." % len(movie_model))
 
-    start_index = (page - 1) * page_size
+    start_index = (page_number - 1) * page_size
     end_index = start_index + page_size
 
     return {

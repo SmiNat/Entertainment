@@ -363,7 +363,8 @@ create_table_query = """
         description     TEXT,
         genres          VARCHAR     NOT NULL,
         avg_rating      FLOAT,
-        rating_reviews  INTEGER,
+        num_ratings     INTEGER,
+        first_published DATE,
         created_by      VARCHAR,
         updated_by      VARCHAR,
         UNIQUE(title, author)
@@ -392,9 +393,11 @@ db_books_temp = {
         "ALTER TABLE books_temp RENAME COLUMN Description TO description;",
         "ALTER TABLE books_temp RENAME COLUMN Genres TO genres;",
         "ALTER TABLE books_temp RENAME COLUMN Avg_Rating TO avg_rating;",
+        "ALTER TABLE books_temp RENAME COLUMN Num_ratings TO num_ratings;",
     ],
     "add columns": [
-        "ALTER TABLE books_temp ADD COLUMN rating_reviews INTEGER;",
+        # "ALTER TABLE books_temp ADD COLUMN num_ratings INTEGER;",
+        "ALTER TABLE books_temp ADD COLUMN first_published DATE;",
         "ALTER TABLE books_temp ADD COLUMN created_by VARCHAR;",
         "ALTER TABLE books_temp ADD COLUMN updated_by VARCHAR;",
     ],
@@ -416,22 +419,22 @@ db_books_temp = {
         """,
         """
         UPDATE books_temp
-        SET Num_Ratings = replace(Num_Ratings, ',', '')
-        WHERE Num_Ratings LIKE '%,%';
+        SET num_ratings = replace(num_ratings, ',', '')
+        WHERE num_ratings LIKE '%,%';
         """,
         """
         UPDATE books_temp
         SET created_by = "www.kaggle.com - ishikajohari"
         WHERE created_by is NULL;
         """,
-        "UPDATE books_temp SET rating_reviews = Num_ratings;",
+        # "UPDATE books_temp SET num_ratings = Num_ratings;",
         "UPDATE books_temp SET title = '---' WHERE title IS NULL;",
         "UPDATE books_temp SET author = '---' WHERE author IS NULL;",
         "UPDATE books_temp SET genres = '---' WHERE genres IS NULL;",
     ],
-    "drop columns #2": [
-        "ALTER TABLE books_temp DROP COLUMN Num_Ratings;",
-    ],
+    # "drop columns #2": [
+    #     "ALTER TABLE books_temp DROP COLUMN Num_Ratings;",
+    # ],
     "drop duplicate rows": [
         """
         DELETE FROM  books_temp

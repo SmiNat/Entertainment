@@ -12,7 +12,8 @@ def book_payload(
     description: str | None = "Test description",
     genres: list[str] | None = ["Fantasy", "Fiction"],
     avg_rating: float | None = 4.5,
-    rating_reviews: int | None = None,
+    num_ratings: int | None = None,
+    first_published: str | None = None,
 ) -> dict:
     payload = {
         "title": title,
@@ -20,7 +21,8 @@ def book_payload(
         "description": description,
         "genres": genres,
         "avg_rating": avg_rating,
-        "rating_reviews": rating_reviews,
+        "num_ratings": num_ratings,
+        "first_published": first_published,
     }
     return payload
 
@@ -31,7 +33,8 @@ def create_book(
     description: str | None = "Test description",
     genres: list[str] | None = ["Fantasy", "Fiction"],
     avg_rating: float | None = 4.5,
-    rating_reviews: int | None = None,
+    num_ratings: int | None = None,
+    first_published: str | None = None,
     created_by: str | None = "John_Doe",
 ):
     if isinstance(genres, list):
@@ -43,7 +46,8 @@ def create_book(
         description=description,
         genres=genres,
         avg_rating=avg_rating,
-        rating_reviews=rating_reviews,
+        num_ratings=num_ratings,
+        first_published=first_published,
         created_by=created_by,
     )
 

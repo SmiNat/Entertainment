@@ -15,6 +15,33 @@ def check_date(date_value: str, format: str = "%Y-%m-%d") -> None:
         )
 
 
+def check_genres_list(genres: list[str], accessible_genres: list[str]):
+    if not genres or all(element is None for element in genres):
+        return
+    genres_list = [genre.strip().title() for genre in genres if genre]
+    for genre in genres_list:
+        if genre in [genre.title() for genre in accessible_genres]:
+            continue
+        else:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "Invalid genre: check 'get movies genres' for list of accessible genres.",
+            )
+    genres_list.sort()
+    # genres_string = ", ".join(genres_list)
+    # return genres_string
+    return genres_list
+
+
+def convert_genres_list_to_a_string(genres: list) -> str:
+    if not genres:
+        return ""
+    genres_list = genres
+    genres_list.sort()
+    genres_string = ", ".join(genres_list)
+    return genres_string
+
+
 def check_genres_list_and_convert_to_a_string(
     genres: list[str], accessible_genres: list[str]
 ):

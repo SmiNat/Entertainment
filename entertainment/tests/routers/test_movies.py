@@ -40,18 +40,7 @@ async def test_get_movies_genres_non_empty_db(async_client: AsyncClient):
 
 
 @pytest.mark.anyio
-async def test_get_all_movies_empty_db(async_client: AsyncClient):
-    response = await async_client.get("/movies/all")
-    expected_result = {
-        "number of movies": 0,
-        "movies": [],
-    }
-    assert response.status_code == 200
-    assert expected_result == response.json()
-
-
-@pytest.mark.anyio
-async def test_get_all_movies_non_empty_db(async_client: AsyncClient):
+async def test_get_all_movies_200_non_empty_db(async_client: AsyncClient):
     movie1 = create_movie(title="First Movie", score=9.2, genres=["comedy"])
     movie2 = create_movie(title="Second Movie", orig_title="sec. movie")
     movie3 = create_movie(score=2.7, premiere="2023-03-02", genres="drama")
@@ -71,13 +60,20 @@ async def test_get_all_movies_non_empty_db(async_client: AsyncClient):
 
 
 @pytest.mark.anyio
+async def test_get_all_movies_404_empty_db(async_client: AsyncClient):
+    response = await async_client.get("/movies/all")
+    assert response.status_code == 404
+    assert "Movies not found" in response.json()["detail"]
+
+
+@pytest.mark.anyio
 async def test_get_all_movies_pagination(async_client: AsyncClient):
     # Creating 3 movies in db with titles: "1", "2", "3"
     for x in range(1, 4):
         create_movie(title=str(x))
 
     # Making the request to the endpoint with page size and page number - empty page
-    params = {"page_size": 10, "page": 2}
+    params = {"page_size": 10, "page_number": 2}
     expected_result = {
         "number of movies": 3,
         "movies": [],
@@ -87,7 +83,7 @@ async def test_get_all_movies_pagination(async_client: AsyncClient):
     assert expected_result == response.json()
 
     # Making the request to the endpoint with page size and page number - page with movies
-    params = {"page_size": 1, "page": 3}
+    params = {"page_size": 1, "page_number": 3}
     expected_result = {
         "number of movies": 3,
         "movies": [
@@ -97,13 +93,13 @@ async def test_get_all_movies_pagination(async_client: AsyncClient):
                 "overview": None,
                 "orig_title": None,
                 "budget": None,
-                "country": "US",
+                "country": "ES",
                 "updated_by": None,
                 "premiere": "2011-11-11",
                 "title": "3",
                 "genres": "Action",
                 "crew": "Test crew",
-                "orig_lang": "English",
+                "orig_lang": "Spanish",
                 "revenue": None,
                 "created_by": "John_Doe",
             }
@@ -112,6 +108,12 @@ async def test_get_all_movies_pagination(async_client: AsyncClient):
     response = await async_client.get("/movies/all", params=params)
     assert response.status_code == 200
     assert expected_result == response.json()
+
+    # Page size out of range
+    params = {"page_size": 222, "page_number": 3}
+    response = await async_client.get("/movies/all", params=params)
+    assert response.status_code == 422
+    assert "Input should be less than or equal to 100" in response.text
 
 
 @pytest.mark.anyio
@@ -341,7 +343,7 @@ async def test_update_movie_202(
     assert movie["orig_title"] == "Nigdy w życiu!"
 
     user, token = created_user_token
-    payload = {"score": 9.9, "original title": "Never, ever!"}
+    payload = {"score": 9.9, "orig_title": "Never, ever!"}
 
     response = await async_client.patch(
         "/movies/Nigdy w życiu!/2004-02-13",
@@ -402,7 +404,11 @@ async def test_update_movie_202_update_by_the_admin(
         role="admin",
     )
 
-    payload = {"title": "Updated Movie", "premiere": "2022-01-01"}
+    payload = {
+        "title": "Updated Movie",
+        "premiere": "2022-01-01",
+        "genres": ["comedy", "war"],
+    }
 
     response = await async_client.patch(
         "/movies/Test Movie/2011-11-11",
@@ -513,7 +519,7 @@ async def test_update_movie_400_if_no_data_to_change(
         ({"premiere": "11-11-2011"}, "Input should be a valid date or datetime"),
         ({"revenue": "100k"}, "Input should be a valid number"),
         ({"country": "san escobar"}, "Invalid country name"),
-        ({"original_language": "invalid"}, "Invalid language name"),
+        ({"orig_lang": "invalid"}, "Invalid language name"),
         ({"genres": "invalid, drama"}, "Input should be a valid list"),
         (
             {"genres": ["invalid", "genre"]},
