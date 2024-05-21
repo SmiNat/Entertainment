@@ -2,9 +2,8 @@ import datetime
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import Row, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -13,15 +12,17 @@ from starlette import status
 
 from entertainment.database import get_db
 from entertainment.enums import MovieGenres
-from entertainment.models import Movies, Users
+from entertainment.exceptions import DatabaseIntegrityError, RecordNotFoundException
+from entertainment.models import Movies
 from entertainment.routers.auth import get_current_user
 from entertainment.routers.utils import (
     check_country,
     check_date,
-    check_genres_list_and_convert_to_a_string,
+    check_if_author_or_admin,
+    check_items_list,
     check_language,
+    convert_items_list_to_a_sorted_string,
     convert_list_to_unique_values,
-    validate_field,
 )
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,21 @@ class MovieRequest(BaseModel):
 
     class ConfigDict:
         from_attributes = True
+
+    @field_validator("orig_lang")
+    @classmethod
+    def language_is_in_pycountry_library(cls, lang: str):
+        return check_language(lang)
+
+    @field_validator("country")
+    @classmethod
+    def country_is_in_pycountry_library(cls, country: str):
+        return check_country(country)
+
+    @field_validator("genres")
+    @classmethod
+    def genres_are_valid_and_converted_to_a_string(cls, genres: str):
+        return check_items_list(genres, accessible_movie_genres)
 
 
 class MovieResponse(MovieRequest):
@@ -119,7 +135,7 @@ async def get_all_movies(
     movie_model = db.query(Movies).all()
 
     if not movie_model:
-        raise HTTPException(status_code=404, detail="Movies not found.")
+        raise RecordNotFoundException(detail="Movies not found.")
 
     logger.debug("Database hits (all movies): %s records." % len(movie_model))
 
@@ -141,8 +157,12 @@ async def get_all_movies(
 async def search_movies(
     db: db_dependency,
     title: str = "",
-    premiere_since: str = Query(default="1900-1-1", description="Use yyyy-mm-dd."),
-    premiere_before: str = Query(default="2050-1-1", description="Use yyyy-mm-dd."),
+    premiere_since: str = Query(
+        default="1900-1-1", description="Use YYYY-MM-DD, eg. 2024-07-12."
+    ),
+    premiere_before: str = Query(
+        default="2050-1-1", description="Use YYYY-MM-DD, eg. 2024-07-12."
+    ),
     score_ge: float = Query(default=0, ge=0, le=10),
     genre_primary: str | None = None,
     genre_secondary: str | None = None,
@@ -173,7 +193,7 @@ async def search_movies(
         query = query.filter(Movies.orig_lang.icontains(language))
 
     if query is None:
-        raise HTTPException(status_code=404, detail="Movie not found.")
+        raise RecordNotFoundException(detail="Movie not found.")
 
     logger.debug("Database hits (search movies): %s." % len(query.all()))
 
@@ -190,47 +210,37 @@ async def add_movie(
             status.HTTP_401_UNAUTHORIZED, "Could not validate credentials."
         )
 
-    genres = check_genres_list_and_convert_to_a_string(
-        movie_request.genres, accessible_movie_genres
-    )
-    language = check_language(movie_request.orig_lang)
-    country = check_country(movie_request.country)
-
-    movie_model = Movies(**movie_request.model_dump(), created_by=user.get("username"))
-    movie_model.genres = genres
-    movie_model.orig_lang = language
-    movie_model.country = country
+    movie = Movies(**movie_request.model_dump(), created_by=user.get("username"))
+    genres = convert_items_list_to_a_sorted_string(movie_request.genres)
+    movie.genres = genres
 
     try:
-        db.add(movie_model)
+        db.add(movie)
         db.commit()
-        db.refresh(movie_model)
+        db.refresh(movie)
     except IntegrityError:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            f"Unique constraint failed: a movie '{movie_request.title}' "
-            "is already registered in the database.",
-        )
+        raise DatabaseIntegrityError
 
-    logger.debug("Movie: '%s' successfully added to database." % movie_model.title)
+    logger.debug(
+        "Movie: '%s' was successfully added to database by the '%s' user."
+        % (movie.title, user["username"])
+    )
 
-    return movie_model
+    return movie
 
 
 @router.patch("/{title}/{premiere}", status_code=202)
 async def update_movie(
-    title: str,
-    premiere: str,
     db: db_dependency,
     user: user_dependency,
     movie_update: UpdateMovieRequest,
+    title: str,
+    premiere: str = Path(description="Use YYYY-MM-DD, eg. 2024-07-12."),
 ):
     """Update movie - endpoint available for user who created a movie record or for an admin user."""
 
-    check_date(premiere)
+    logger.debug("Movie to update: '%s' (%s)." % (title, premiere))
 
-    # Movie to update
-    logger.debug("Movie to update: title='%s', premiere='%s" % (title, premiere))
     movie = (
         db.query(Movies)
         .filter(
@@ -240,65 +250,36 @@ async def update_movie(
         .first()
     )
     if movie is None:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND,
-            f"Movie '{title}' ({premiere}) not found in the database.",
-        )
-    logger.debug("Movie found: %s" % jsonable_encoder(movie))
-
-    # Movie update available only for movie 'created_by' the authenticated_user
-    # or for admin user
-    authenticated_user = db.query(Users).filter(Users.id == user["id"]).first()
-
-    if not (
-        authenticated_user.role == "admin"
-        or authenticated_user.username == movie.created_by
-    ):
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN,
-            detail="Only a user with the 'admin' role or the author of the "
-            "movie record can update the movie.",
+        raise RecordNotFoundException(
+            extra_data=f"Searched movie: '{title}' ({premiere})."
         )
 
-    # Fields to update
-    updated_fields = movie_update.model_dump(exclude_unset=True, exclude_none=True)
-    logger.debug("Fields to update: %s" % updated_fields)
+    # Verify if user is authorized to update a movie
+    check_if_author_or_admin(user, movie)
 
-    # Fields to validate before update
-    validate_field(
-        "genres",
-        updated_fields,
-        check_genres_list_and_convert_to_a_string,
-        accessible_movie_genres,
-    )
-    validate_field("orig_lang", updated_fields, check_language)
-    validate_field("country", updated_fields, check_country)
-    logger.debug("Final fields to update: %s" % updated_fields)
-
-    if not updated_fields:
+    fields_to_update = movie_update.model_dump(exclude_unset=True, exclude_none=True)
+    if not fields_to_update:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail="No data input provided."
         )
+    logger.debug("Fields to update: %s" % fields_to_update)
 
     try:
-        for field, value in updated_fields.items():
+        for field, value in fields_to_update.items():
             logger.debug("Updating: field: %s, value: %s" % (field, value))
-            setattr(movie, field, value)
-        movie.updated_by = authenticated_user.username
-
+            if field == "genres":
+                setattr(movie, field, convert_items_list_to_a_sorted_string(value))
+            else:
+                setattr(movie, field, value)
+        movie.updated_by = user["username"]
         db.commit()
         db.refresh(movie)
-
     except IntegrityError:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "Unique constraint failed: a movie with the same title and premiere "
-            "date is already registered in the database.",
-        )
+        raise DatabaseIntegrityError
 
     logger.debug(
         "Movie '%s' (%s) was successfully updated by the '%s' user."
-        % (title, premiere, authenticated_user.username)
+        % (title, premiere, user["username"])
     )
 
     return movie
@@ -308,6 +289,8 @@ async def update_movie(
 async def delete_movie(
     title: str, premiere: str, db: db_dependency, user: user_dependency
 ):
+    logger.debug("Movie to delete: '%s' (%s)." % (title, premiere))
+
     movie = (
         db.query(Movies)
         .filter(
@@ -317,27 +300,17 @@ async def delete_movie(
         .first()
     )
     if movie is None:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND,
-            f"Movie '{title}' ({premiere}) not found in the database.",
+        raise RecordNotFoundException(
+            extra_data=f"Searched movie: '{title}' ({premiere})."
         )
-    logger.debug("Movie to delete: '%s' (%s)." % (title, premiere))
 
-    authenticated_user = db.query(Users).filter(Users.id == user["id"]).first()
-    if not (
-        authenticated_user.role == "admin"
-        or authenticated_user.username == movie.created_by
-    ):
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN,
-            detail="Only a user with the 'admin' role or the author of the "
-            "movie record can delete the movie.",
-        )
+    # Verify if user is authorised to update a movie
+    check_if_author_or_admin(user, movie)
 
     db.delete(movie)
     db.commit()
 
     logger.debug(
-        "Movie '%s' (%s) successfully deleted by the user '%s'."
+        "Movie '%s' (%s) was successfully deleted by the '%s' user."
         % (movie.title, movie.premiere, user["username"])
     )

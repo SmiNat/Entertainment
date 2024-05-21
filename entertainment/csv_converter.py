@@ -325,6 +325,10 @@ db_movies_temp = {
         SET created_by = "www.kaggle.com - ashpalsingh1525"
         WHERE created_by is NULL;
         """,
+        """
+        UPDATE movies_temp
+        SET orig_lang = trim(orig_lang);
+        """,
         "UPDATE movies_temp SET names = '---' WHERE names IS NULL;",
         "UPDATE movies_temp SET date_x = '---' WHERE date_x IS NULL;",
         "UPDATE movies_temp SET genre = '---' WHERE genre IS NULL;",
@@ -396,7 +400,6 @@ db_books_temp = {
         "ALTER TABLE books_temp RENAME COLUMN Num_ratings TO num_ratings;",
     ],
     "add columns": [
-        # "ALTER TABLE books_temp ADD COLUMN num_ratings INTEGER;",
         "ALTER TABLE books_temp ADD COLUMN first_published DATE;",
         "ALTER TABLE books_temp ADD COLUMN created_by VARCHAR;",
         "ALTER TABLE books_temp ADD COLUMN updated_by VARCHAR;",
@@ -427,14 +430,10 @@ db_books_temp = {
         SET created_by = "www.kaggle.com - ishikajohari"
         WHERE created_by is NULL;
         """,
-        # "UPDATE books_temp SET num_ratings = Num_ratings;",
         "UPDATE books_temp SET title = '---' WHERE title IS NULL;",
         "UPDATE books_temp SET author = '---' WHERE author IS NULL;",
         "UPDATE books_temp SET genres = '---' WHERE genres IS NULL;",
     ],
-    # "drop columns #2": [
-    #     "ALTER TABLE books_temp DROP COLUMN Num_Ratings;",
-    # ],
     "drop duplicate rows": [
         """
         DELETE FROM  books_temp

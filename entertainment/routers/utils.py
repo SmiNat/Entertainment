@@ -4,8 +4,26 @@ from typing import Callable
 import pycountry
 from fastapi import HTTPException, status
 
+from entertainment.models import Books, Games, Movies, Songs, Users
+
+
+def check_if_author_or_admin(
+    user: Users | dict, record: Books | Games | Movies | Songs
+):
+    """Validates if user is either the author of a given database record or
+    if user has 'admin' status. Otherwise raises HTTP Exception."""
+    role = user["role"] if isinstance(user, dict) else user.role
+    username = user["username"] if isinstance(user, dict) else user.username
+    if not (role == "admin" or username == record.created_by):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail="Only a user with the 'admin' role or the author of the "
+            "database record can change or delete the record from the database.",
+        )
+
 
 def check_date(date_value: str, format: str = "%Y-%m-%d") -> None:
+    """Validates if date field is presented in correct format."""
     try:
         datetime.datetime.strptime(date_value, format).date()
     except ValueError:
@@ -15,50 +33,50 @@ def check_date(date_value: str, format: str = "%Y-%m-%d") -> None:
         )
 
 
-def check_genres_list(genres: list[str], accessible_genres: list[str]):
-    if not genres or all(element is None for element in genres):
+def check_items_list(
+    items: list[str],
+    accessible_items: list[str],
+    status_code: int = 422,
+    error_message: str = "Invalid genre: check 'get genres' for list of accessible genres.",
+) -> list:
+    """Validates if all items are acceptable given accessible items list.
+    Returns unique, sorted list of items."""
+    if not items or all(element is None for element in items):
         return
-    genres_list = [genre.strip().title() for genre in genres if genre]
-    for genre in genres_list:
-        if genre in [genre.title() for genre in accessible_genres]:
-            continue
+
+    items_list = [item.strip().title() for item in items if item]
+    accessible_items = [item.strip().title() for item in accessible_items]
+
+    items_set = set()
+    for item in items_list:
+        if item in accessible_items:
+            items_set.add(item)
         else:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_ENTITY,
-                "Invalid genre: check 'get movies genres' for list of accessible genres.",
-            )
-    genres_list.sort()
-    # genres_string = ", ".join(genres_list)
-    # return genres_string
-    return genres_list
+            raise HTTPException(status_code=status_code, detail=error_message)
+
+    items_list = list(items_set)
+    items_list.sort()
+    return items_list
 
 
-def convert_genres_list_to_a_string(genres: list) -> str:
-    if not genres:
-        return ""
-    genres_list = genres
-    genres_list.sort()
-    genres_string = ", ".join(genres_list)
-    return genres_string
+def convert_items_list_to_a_sorted_string(items: list[str]) -> str | None:
+    """Converts a list of items into a string of unique sorted items."""
+    if not items:
+        return None
+    items = list(set(items))
+    items.sort()
+    items_string = ", ".join(items)
+    return items_string
 
 
-def check_genres_list_and_convert_to_a_string(
-    genres: list[str], accessible_genres: list[str]
-):
-    if not genres or all(element is None for element in genres):
-        return
-    genres_list = [genre.strip().title() for genre in genres if genre]
-    for genre in genres_list:
-        if genre in [genre.title() for genre in accessible_genres]:
-            continue
-        else:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_ENTITY,
-                "Invalid genre: check 'get movies genres' for list of accessible genres.",
-            )
-    genres_list.sort()
-    genres_string = ", ".join(genres_list)
-    return genres_string
+def check_items_list_and_convert_to_a_string(
+    items: list[str], accessible_items: list[str]
+) -> str | None:
+    """Validates if all items are acceptable given accessible items list.
+    Returns unique, sorted list of items converted into a string."""
+    items_list = check_items_list(items, accessible_items)
+    items_string = ", ".join(items_list) if items_list else None
+    return items_string
 
 
 def check_country(country: str) -> str | None:
@@ -114,7 +132,7 @@ def convert_list_to_unique_values(
 ):
     """
     Converts a list of strings to a list of unique values.
-    If the string values in the list represent a list itself, converts each string
+    If the string values in the list represents a list itself, converts each string
     to the list based on the indicated separator and from these lists creates
     a unique list sorted by value.
     """

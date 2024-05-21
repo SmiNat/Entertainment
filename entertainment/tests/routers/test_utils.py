@@ -6,11 +6,42 @@ from fastapi import HTTPException
 from entertainment.routers.utils import (
     check_country,
     check_date,
-    check_genres_list_and_convert_to_a_string,
+    check_if_author_or_admin,
+    check_items_list,
+    check_items_list_and_convert_to_a_string,
     check_language,
+    convert_items_list_to_a_sorted_string,
     convert_list_to_unique_values,
     validate_field,
 )
+from entertainment.tests.utils_movies import create_movie
+from entertainment.tests.utils_users import create_db_user
+
+
+@pytest.mark.parametrize(
+    "username, role, created_by, is_exception_risen",
+    [
+        ("test_user", "user", "test_user", False),
+        ("test_user", "admin", "other_user", False),
+        ("test_user", "user", "other_user", True),
+    ],
+)
+def test_check_if_author_or_admin(
+    username: str, role: str, created_by: str, is_exception_risen: bool
+):
+    user = create_db_user(username=username, role=role)
+    record = create_movie(created_by=created_by)
+    if is_exception_risen:
+        with pytest.raises(HTTPException) as exc_info:
+            check_if_author_or_admin(user, record)
+        assert exc_info.value.status_code == 403
+        assert (
+            "Only a user with the 'admin' role or the author of the database "
+            "record can change or delete the record from the database."
+            in exc_info.value.detail
+        )
+    else:
+        assert check_if_author_or_admin(user, record) is None
 
 
 def test_check_date():
@@ -27,8 +58,22 @@ def test_check_date():
     assert exc_info.value.status_code == 422
 
 
-def test_check_genres_list_and_convert_to_a_string():
-    accessible_movie_genres = [
+@pytest.mark.parametrize(
+    "example_list, is_valid, expected_result",
+    [
+        (["war", "romance", "action", "war"], True, ["Action", "Romance", "War"]),
+        ([None, None], True, None),
+        (
+            ["war", "crazy", "invalid"],
+            False,
+            "Invalid genre: check 'get genres' for list of accessible genres",
+        ),
+    ],
+)
+def test_check_items_list(
+    example_list: list, is_valid: bool, expected_result: list | str | None
+):
+    accessible_items = [
         "Action",
         "Comedy",
         "Crime",
@@ -37,27 +82,52 @@ def test_check_genres_list_and_convert_to_a_string():
         "Romance",
         "War",
     ]
-    # Example test case where genres are valid
-    response = check_genres_list_and_convert_to_a_string(
-        ["action", "war", "comedy"], accessible_movie_genres
+    if is_valid:
+        result = check_items_list(example_list, accessible_items)
+        assert result == expected_result
+    else:
+        with pytest.raises(HTTPException) as exc_info:
+            check_items_list(example_list, accessible_items)
+        assert exc_info.value.status_code == 422
+        assert expected_result in exc_info.value.detail
+
+
+def test_convert_items_list_to_a_sorted_string():
+    example_list = ["item1", "new_item", "Item7", "item1"]
+    expected_result = "Item7, item1, new_item"
+    result = convert_items_list_to_a_sorted_string(example_list)
+    assert expected_result == result
+
+
+def test_check_items_list_and_convert_to_a_string():
+    accessible_items = [
+        "Action",
+        "Comedy",
+        "Crime",
+        "Horror",
+        "History",
+        "Romance",
+        "War",
+    ]
+    # Example test case where items are valid
+    response = check_items_list_and_convert_to_a_string(
+        ["action", "war", "comedy"], accessible_items
     )
     assert response == "Action, Comedy, War"
 
-    # Example test case where genres are invalid
+    # Example test case where items are invalid
     with pytest.raises(HTTPException) as exc_info:
-        check_genres_list_and_convert_to_a_string(
-            ["romance", "history", "statistics"], accessible_movie_genres
+        check_items_list_and_convert_to_a_string(
+            ["romance", "history", "statistics"], accessible_items
         )
     assert exc_info.value.status_code == 422
     assert (
-        "Invalid genre: check 'get movies genres' for list of accessible genres"
+        "Invalid genre: check 'get genres' for list of accessible genres"
         in exc_info.value.detail
     )
 
     # Example test case with list of empty records
-    response = check_genres_list_and_convert_to_a_string(
-        [None, None], accessible_movie_genres
-    )
+    response = check_items_list_and_convert_to_a_string([None, None], accessible_items)
     assert response is None
 
 
@@ -65,7 +135,6 @@ def test_check_genres_list_and_convert_to_a_string():
     "valid_data", [("pl"), ("pol"), ("Poland"), ("poland"), ("   poland")]
 )
 def test_check_country_with_valid_data(valid_data: str):
-    print(valid_data)
     response = check_country(valid_data)
     assert response == "PL"
 
@@ -86,7 +155,6 @@ def test_check_country_with_empty_data():
     "valid_data", [("pl"), ("pol"), ("polish"), ("Polish"), ("   polish")]
 )
 def test_check_language_with_valid_data(valid_data: str):
-    print(valid_data)
     response = check_language(valid_data)
     assert response == "Polish"
 
@@ -109,20 +177,20 @@ def test_check_language_with_empty_data():
         (
             "genres",
             {"genres": [None, None], "score": 6.6},
-            check_genres_list_and_convert_to_a_string,
+            check_items_list_and_convert_to_a_string,
             {"score": 6.6},
         ),
         (
             "genres",
             {"genres": ["Action", "War"], "score": 6.6},
-            check_genres_list_and_convert_to_a_string,
+            check_items_list_and_convert_to_a_string,
             {"genres": "Action, War", "score": 6.6},
         ),
         (
             "genres",
             {"genres": ["cinema", "incorrect"], "score": 6.6},
-            check_genres_list_and_convert_to_a_string,
-            "Invalid genre: check 'get movies genres' for list of accessible genres",
+            check_items_list_and_convert_to_a_string,
+            "Invalid genre: check 'get genres' for list of accessible genres",
         ),
         (
             "orig_lang",

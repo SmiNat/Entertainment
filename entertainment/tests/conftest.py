@@ -157,17 +157,17 @@ async def added_movie(
 ) -> dict:
     """Creates movie record in the database before running a test."""
     payload = {
-        "title": "Nigdy w życiu!",
-        "premiere": "2004-02-13",
-        "score": 6.2,
-        "genres": ["comedy", "romance"],
-        "overview": "Judyta po rozwodzie zaczyna budowę domu pod Warszawą i znajduje nową miłość.",
-        "crew": "Danuta Stenka, Judyta Kozłowska, Joanna Brodzik, Ula, Artur Żmijewski, Adam, Jan Frycz, Tomasz Kozłowski",
-        "orig_title": "Nigdy w życiu!",
-        "orig_lang": "Polish",
-        "budget": None,
-        "revenue": None,
-        "country": "PL",
+        "title": "Deadpool",
+        "premiere": "2016-02-11",
+        "score": 7.6,
+        "genres": ["comedy", "Adventure", "Action"],
+        "overview": "The origin story of former Special Forces operative turned mercenary Wade Wilson, who, after being subjected to a rogue experiment that leaves him with accelerated healing powers, adopts the alter ego Deadpool. Armed with his new abilities and a dark, twisted sense of humor, Deadpool hunts down the man who nearly destroyed his life.",
+        "crew": "Ryan Reynolds, Wade Wilson / Deadpool, Morena Baccarin, Vanessa, Ed Skrein, Ajax, T.J. Miller, Weasel, Gina Carano, Angel Dust, Leslie Uggams, Blind Al, Brianna Hildebrand, Negasonic Teenage Warhead, Karan Soni, Dopinder, Jed Rees, Recruiter",
+        "orig_title": "Deadpool",
+        "orig_lang": "English",
+        "budget": 58000000,
+        "revenue": 781947691,
+        "country": "AU",
     }
     await async_client.post(
         "/movies/add",
@@ -175,10 +175,7 @@ async def added_movie(
         headers={"Authorization": f"Bearer {created_token}"},
     )
     movie = (
-        TestingSessionLocal()
-        .query(Movies)
-        .filter(Movies.title == "Nigdy w życiu!")
-        .first()
+        TestingSessionLocal().query(Movies).filter(Movies.title == "Deadpool").first()
     )
     return jsonable_encoder(movie)
 

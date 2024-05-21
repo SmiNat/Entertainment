@@ -267,9 +267,9 @@ async def test_add_movie_401_if_not_authenticated(
 @pytest.mark.parametrize(
     "invalid_title, comment",
     [
-        ("Nigdy w życiu!", "the same movie title"),
-        ("nigdy W życiu!", "the same movie title - case insensitive"),
-        (" Nigdy w życiu!   ", "the same movie title - stripped from whitespaces"),
+        ("Deadpool", "the same movie title"),
+        ("deadpool", "the same movie title - case insensitive"),
+        (" deadpool   ", "the same movie title - stripped from whitespaces"),
     ],
 )
 async def test_add_movie_422_not_unique_movie(
@@ -281,7 +281,7 @@ async def test_add_movie_422_not_unique_movie(
     mock_get_movies_genres,
 ):
     """The user can only create a movie with unique title and premiere date."""
-    payload = movie_payload(title=invalid_title, premiere="2004-02-13")
+    payload = movie_payload(title=invalid_title, premiere=added_movie["premiere"])
 
     response = await async_client.post(
         "/movies/add",
@@ -290,7 +290,7 @@ async def test_add_movie_422_not_unique_movie(
     )
     assert response.status_code == 422
     assert (
-        f"Unique constraint failed: a movie '{invalid_title}' is already registered in the database."
+        "Unique constraint failed: Record already exists in the database."
         in response.json()["detail"]
     )
 
@@ -309,7 +309,7 @@ async def test_add_movie_422_not_unique_movie(
         ({"orig_lang": "invalid"}, "Invalid language name"),
         (
             {"genres": ["invalid", "genre"]},
-            "Invalid genre: check 'get movies genres' for list of accessible genres",
+            "Invalid genre: check 'get genres' for list of accessible genres",
         ),
     ],
 )
@@ -339,14 +339,14 @@ async def test_update_movie_202(
 ):
     movie = added_movie
     assert movie["updated_by"] is None
-    assert movie["score"] == 6.2
-    assert movie["orig_title"] == "Nigdy w życiu!"
+    assert movie["score"] == 7.6
+    assert movie["orig_title"] == "Deadpool"
 
     user, token = created_user_token
-    payload = {"score": 9.9, "orig_title": "Never, ever!"}
+    payload = {"score": 9.9, "orig_title": "Pool of death"}
 
     response = await async_client.patch(
-        "/movies/Nigdy w życiu!/2004-02-13",
+        "/movies/Deadpool/2016-02-11",
         json=payload,
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -359,11 +359,9 @@ async def test_update_movie_202(
 async def test_update_movie_401_if_not_authenticated(
     async_client: AsyncClient, added_movie: dict, mock_get_movies_genres
 ):
-    payload = {"score": 9.9, "original title": "Never, ever!"}
+    payload = {"score": 9.9, "original title": "Pool of death"}
 
-    response = await async_client.patch(
-        "/movies/Nigdy w życiu!/2004-02-13", json=payload
-    )
+    response = await async_client.patch("/movies/Deadpool/2016-02-11", json=payload)
     assert response.status_code == 401
     assert "Not authenticated" in response.content.decode()
 
@@ -372,16 +370,16 @@ async def test_update_movie_401_if_not_authenticated(
 async def test_update_movie_404_movie_not_found(
     async_client: AsyncClient, created_token: str
 ):
-    payload = {"score": 9.9, "original title": "Never, ever!"}
+    payload = {"score": 9.9, "original title": "Pool of death"}
 
     response = await async_client.patch(
-        "/movies/Nigdy w życiu!/2004-02-13",
+        "/movies/Deadpool/2016-02-11",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 404
     assert (
-        "Movie 'Nigdy w życiu!' (2004-02-13) not found in the database."
+        "The record was not found in the database. Searched movie: 'Deadpool' (2016-02-11)."
         in response.json()["detail"]
     )
 
@@ -407,7 +405,7 @@ async def test_update_movie_202_update_by_the_admin(
     payload = {
         "title": "Updated Movie",
         "premiere": "2022-01-01",
-        "genres": ["comedy", "war"],
+        "genres": ["comedy", "war", "Comedy", "action"],
     }
 
     response = await async_client.patch(
@@ -437,8 +435,8 @@ async def test_update_movie_403_update_by_the_user_who_is_not_the_movie_creator(
     )
     assert response.status_code == 403
     assert (
-        "Only a user with the 'admin' role or the author of the movie record can update the movie"
-        in response.text
+        "Only a user with the 'admin' role or the author of the database record "
+        "can change or delete the record from the database" in response.text
     )
 
 
@@ -470,18 +468,18 @@ async def test_update_movie_422_not_unique_movie(
     # Creating other movie record in db (with the title of 'Test Movie' and premiere at 2011-11-11)
     create_movie()
 
-    # Calling the endpoint with attempt to change the 'Nigdy w życiu!'
+    # Calling the endpoint with attempt to change the 'Deadpool'
     # movie title and premiere to the same as already existing one
     # (created by create_movie func)
     response = await async_client.patch(
-        "/movies/Nigdy w życiu!/2004-02-13",
+        "/movies/Deadpool/2016-02-11",
         json={"title": title, "premiere": "2011-11-11"},
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 422
     assert (
-        "Unique constraint failed: a movie with the same title and premiere "
-        "date is already registered in the database." in response.json()["detail"]
+        "Unique constraint failed: Record already exists in the database."
+        in response.json()["detail"]
     )
 
 
@@ -503,7 +501,7 @@ async def test_update_movie_400_if_no_data_to_change(
     payload = invalid_payload
 
     response = await async_client.patch(
-        "/movies/Nigdy w życiu!/2004-02-13",
+        "/movies/Deadpool/2016-02-11",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -523,7 +521,7 @@ async def test_update_movie_400_if_no_data_to_change(
         ({"genres": "invalid, drama"}, "Input should be a valid list"),
         (
             {"genres": ["invalid", "genre"]},
-            "Invalid genre: check 'get movies genres' for list of accessible genres",
+            "Invalid genre: check 'get genres' for list of accessible genres",
         ),
     ],
 )
@@ -537,7 +535,7 @@ async def test_update_movie_422_incorrect_update_data(
     payload = invalid_payload
 
     response = await async_client.patch(
-        "/movies/Nigdy w życiu!/2004-02-13",
+        "/movies/Deadpool/2016-02-11",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -556,7 +554,7 @@ async def test_delete_movie_204(
     movie = (
         TestingSessionLocal()
         .query(Movies)
-        .filter(Movies.premiere == "2004-02-13", Movies.title == "Nigdy w życiu!")
+        .filter(Movies.premiere == "2016-02-11", Movies.title == "Deadpool")
         .first()
     )
     assert movie is not None
@@ -564,17 +562,14 @@ async def test_delete_movie_204(
 
     # Calling the endpoint
     response = await async_client.delete(
-        "/movies/Nigdy w życiu!/2004-02-13",
+        "/movies/Deadpool/2016-02-11",
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 204
 
     # Checking if the movie no longer exists in db
     movie = (
-        TestingSessionLocal()
-        .query(Movies)
-        .filter(Movies.title == "Nigdy w życiu!")
-        .first()
+        TestingSessionLocal().query(Movies).filter(Movies.title == "Deadpool").first()
     )
     assert movie is None
 
@@ -589,7 +584,7 @@ async def test_delete_movie_401_if_not_authenticated(
     movie = (
         TestingSessionLocal()
         .query(Movies)
-        .filter(Movies.premiere == "2004-02-13", Movies.title == "Nigdy w życiu!")
+        .filter(Movies.premiere == "2016-02-11", Movies.title == "Deadpool")
         .first()
     )
     assert movie is not None
@@ -597,17 +592,14 @@ async def test_delete_movie_401_if_not_authenticated(
 
     # Calling the endpoint
     response = await async_client.delete(
-        "/movies/Nigdy w życiu!/2004-02-13",
+        "/movies/Deadpool/2016-02-11",
     )
     assert response.status_code == 401
     assert "Not authenticated" in response.content.decode()
 
     # Checking if the movie still exists in db
     movie = (
-        TestingSessionLocal()
-        .query(Movies)
-        .filter(Movies.title == "Nigdy w życiu!")
-        .first()
+        TestingSessionLocal().query(Movies).filter(Movies.title == "Deadpool").first()
     )
     assert movie is not None
 
@@ -665,8 +657,8 @@ async def test_delete_movie_403_delete_by_the_user_who_is_not_the_movie_creator(
     )
     assert response.status_code == 403
     assert (
-        "Only a user with the 'admin' role or the author of the movie record can delete the movie"
-        in response.json()["detail"]
+        "Only a user with the 'admin' role or the author of the database record "
+        "can change or delete the record from the database" in response.json()["detail"]
     )
 
     # Checking if the movie still exists in db
@@ -686,6 +678,6 @@ async def test_delete_movie_404_movie_not_found(
     )
     assert response.status_code == 404
     assert (
-        "Movie 'deadpool' (2004-02-13) not found in the database."
+        "The record was not found in the database. Searched movie: 'deadpool' (2004-02-13)"
         in response.json()["detail"]
     )
