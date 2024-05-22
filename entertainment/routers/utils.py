@@ -1,10 +1,36 @@
 import datetime
+import sqlite3
 from typing import Callable
 
 import pycountry
 from fastapi import HTTPException, status
 
 from entertainment.models import Books, Games, Movies, Songs, Users
+
+
+def get_unique_genres(db_path, table_name: str):
+    # Connect to the SQLite database
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Execute the query to get all genres
+    cursor.execute(f"SELECT genres FROM {table_name}")
+
+    # Fetch all results
+    genres_data = cursor.fetchall()
+
+    # Close the connection
+    conn.close()
+
+    # Process the fetched genres to get unique values
+    all_genres = set()
+    for row in genres_data:
+        genres = row[0].split(", ")
+        all_genres.update(genres)
+
+    # Extract unique values from each genre string in genres list
+    genres = convert_list_to_unique_values(list(all_genres))
+    return genres
 
 
 def check_if_author_or_admin(

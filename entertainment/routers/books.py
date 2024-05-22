@@ -1,16 +1,21 @@
 import datetime
 import logging
+import os  # noqa
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
-from sqlalchemy import select
+from pydantic import BaseModel, Field, field_validator  # noqa
+from sqlalchemy import extract, or_, select
 from sqlalchemy.orm import Session
 
 from entertainment.database import get_db
 from entertainment.models import Books
 from entertainment.routers.auth import get_current_user
-from entertainment.routers.utils import convert_list_to_unique_values
+from entertainment.routers.utils import (  # noqa
+    check_items_list,
+    convert_list_to_unique_values,
+    get_unique_genres,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +24,10 @@ router = APIRouter(prefix="/books", tags=["books"])
 
 db_dependency = Annotated[Session, Depends(get_db)]
 user_dependency = Annotated[dict, Depends(get_current_user)]
+
+
+# accessible_movie_genres = get_books_genres()  # noqa: F821
+accessible_book_genres = get_unique_genres(os.environ.get("DEV_DATABASE_PATH"), "books")
 
 
 class BookRequest(BaseModel):
@@ -41,6 +50,11 @@ class BookRequest(BaseModel):
 
     class DictConfig:
         from_attributes = True
+
+    # @field_validator("genres")
+    # @classmethod
+    # def genres_are_valid_and_converted_to_a_string(cls, genres: list):
+    #     return check_items_list(genres, accessible_book_genres)
 
 
 class BookResponse(BookRequest):
@@ -83,5 +97,58 @@ async def get_all_books(
     end_index = start_index + page_size
 
     logger.debug("Database hits (all books): %s records." % len(books))
-
     return books[start_index:end_index]
+
+
+@router.get(
+    "/search",
+    status_code=200,
+    response_model=None,
+)
+async def search_books(
+    db: db_dependency,
+    title: str = "",
+    author: str = "",
+    genre_primary: str = "",
+    genre_secondary: str = "",
+    min_rating: float | None = Query(default=0, ge=0, le=5),
+    min_votes: int | None = Query(default=0, ge=0),
+    published_year: int | None = Query(
+        default=None, description="Year of publication of the book."
+    ),
+    exclude_empty_data: bool = Query(
+        default=False,
+        description="To exclude from search records with empty rating score or votes.",
+    ),
+    page: int = Query(default=1, gt=0),
+):
+    query = db.query(Books).filter(
+        Books.title.icontains(title),
+        Books.author.icontains(author),
+        Books.genres.icontains(genre_primary),
+        Books.genres.icontains(genre_secondary),
+    )
+
+    if exclude_empty_data is True:
+        query = query.filter(
+            Books.avg_rating >= min_rating,
+            Books.num_ratings >= min_votes,
+        )
+    else:
+        query = query.filter(
+            or_(Books.avg_rating >= min_rating, Books.avg_rating.is_(None)),
+            or_(Books.num_ratings >= min_votes, Books.num_ratings.is_(None)),
+        )
+
+    if published_year is not None:
+        query = query.filter(extract("year", Books.first_published) == published_year)
+
+    logger.debug("Database hits (search books): %s." % len(query.all()))
+
+    results = query.offset((page - 1) * 10).limit(10).all()
+    return {"number of books": len(query.all()), "books": results}
+
+
+@router.post("/add", status_code=201, response_model=BookResponse)
+async def add_book(user: user_dependency, db: db_dependency, new_book: BookRequest):
+    pass

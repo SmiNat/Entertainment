@@ -40,7 +40,7 @@ def create_movie(
     title: str = "Test Movie",
     premiere: str = "2011-11-11",  # ISO 8601 formatted string
     score: float | None = 8.5,
-    genres: list[str] | None = ["Action"],
+    genres: list[str] | None = ["Action", "Mystery"],
     overview: str | None = None,
     crew: str | None = "Test crew",
     orig_title: str | None = None,

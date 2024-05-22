@@ -97,7 +97,7 @@ async def test_get_all_movies_pagination(async_client: AsyncClient):
                 "updated_by": None,
                 "premiere": "2011-11-11",
                 "title": "3",
-                "genres": "Action",
+                "genres": "Action, Mystery",
                 "crew": "Test crew",
                 "orig_lang": "Spanish",
                 "revenue": None,
@@ -130,14 +130,25 @@ async def test_search_movies_empty_db(async_client: AsyncClient):
 @pytest.mark.anyio
 async def test_search_movies_non_empty_db(async_client: AsyncClient):
     movie1 = create_movie(title="First Movie", score=9.2, genres=["comedy", "action"])
-    movie2 = create_movie(title="Second Movie", orig_title="sec. movie")
+    movie2 = create_movie(score=None, title="Second Movie", orig_title="sec. movie")
     movie3 = create_movie(score=2.7, premiere="2023-03-02", genres=["drama", "comedy"])
 
-    # score >= 9.0
-    response = await async_client.get("/movies/search", params={"score_ge": 9.0})
+    # score >= 9.0 with exclude_empty_data = True
+    response = await async_client.get(
+        "/movies/search", params={"score_ge": 9.0, "exclude_empty_data": True}
+    )
     expected_result = {
         "number of movies": 1,
         "movies": [jsonable_encoder(movie1)],
+    }
+    assert response.status_code == 200
+    assert expected_result == response.json()
+
+    # score >= 9.0 with exclude_empty_data = False
+    response = await async_client.get("/movies/search", params={"score_ge": 9.0})
+    expected_result = {
+        "number of movies": 2,
+        "movies": [jsonable_encoder(movie1), jsonable_encoder(movie2)],
     }
     assert response.status_code == 200
     assert expected_result == response.json()

@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import Row, func, select
+from sqlalchemy import Row, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql._typing import _TP
@@ -70,7 +70,7 @@ class MovieRequest(BaseModel):
 
     @field_validator("genres")
     @classmethod
-    def genres_are_valid_and_converted_to_a_string(cls, genres: str):
+    def genres_are_valid_and_converted_to_a_string(cls, genres: list):
         return check_items_list(genres, accessible_movie_genres)
 
 
@@ -169,6 +169,10 @@ async def search_movies(
     country: str | None = None,
     language: str | None = None,
     crew: str | None = None,
+    exclude_empty_data: bool = Query(
+        default=False,
+        description="To exclude from search records with empty score.",
+    ),
     page: int = Query(default=1, gt=0),
 ) -> dict[str, list[Row[_TP]]]:
     check_date(premiere_before)
@@ -177,9 +181,13 @@ async def search_movies(
     query = db.query(Movies).filter(
         Movies.premiere >= premiere_since,
         Movies.premiere <= premiere_before,
-        Movies.score >= score_ge,
         Movies.title.icontains(title),
     )
+
+    if exclude_empty_data:
+        query = query.filter(Movies.score >= score_ge)
+    else:
+        query = query.filter(or_(Movies.score >= score_ge, Movies.score.is_(None)))
 
     if crew is not None:
         query = query.filter(Movies.crew.icontains(crew))
@@ -191,9 +199,6 @@ async def search_movies(
         query = query.filter(Movies.country.icontains(country))
     if language is not None:
         query = query.filter(Movies.orig_lang.icontains(language))
-
-    if query is None:
-        raise RecordNotFoundException(detail="Movie not found.")
 
     logger.debug("Database hits (search movies): %s." % len(query.all()))
 
