@@ -9,6 +9,9 @@ from entertainment.models import Books, Games, Movies, Songs, Users
 
 
 def get_unique_genres(db_path, table_name: str):
+    """Extracts all genres from a given database table, returns the list of unique genres.
+    If genres are stored in rows as a one string separated with commas instead of a list of strings,
+    converts genres as a string into a list before returning unique values."""
     # Connect to the SQLite database
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -25,8 +28,11 @@ def get_unique_genres(db_path, table_name: str):
     # Process the fetched genres to get unique values
     all_genres = set()
     for row in genres_data:
-        genres = row[0].split(", ")
-        all_genres.update(genres)
+        if isinstance(row[0], list):
+            all_genres.update(row[0])
+        elif isinstance(row[0], str):
+            genres = row[0].split(", ")
+            all_genres.update(genres)
 
     # Extract unique values from each genre string in genres list
     genres = convert_list_to_unique_values(list(all_genres))
@@ -82,6 +88,7 @@ def check_items_list(
 
     items_list = list(items_set)
     items_list.sort()
+
     return items_list
 
 

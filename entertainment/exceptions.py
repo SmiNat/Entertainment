@@ -58,8 +58,5 @@ class RecordNotFoundException(HTTPException):
         headers: dict[str, str] = {"WWW-Authenticate": "Bearer"},
     ) -> None:
         self.status_code = status_code
-        if not extra_data:
-            self.detail = detail
-        else:
-            self.detail = detail + " " + extra_data
+        self.detail = detail if not extra_data else detail + " " + extra_data
         self.headers = headers

@@ -1,5 +1,6 @@
 import logging
 import os
+import sqlite3
 from typing import AsyncGenerator, Generator
 from unittest.mock import patch
 
@@ -88,6 +89,41 @@ async def async_client(client) -> AsyncGenerator:
 
 
 # Some app fixtures to use in tests
+
+
+@pytest.fixture
+def database_genres():
+    test_path = os.environ.get("DEV_DATABASE_PATH")
+    conn = sqlite3.connect(test_path)
+
+    # Drop the table if it exists
+    drop_table = """DROP TABLE IF EXISTS test_table;"""
+    conn.execute(drop_table)
+
+    # Create a new table
+    test_table = """
+    CREATE TABLE test_table (
+    id      INTEGER     PRIMARY KEY,
+    title   VARCHAR,
+    genres  TEXT
+    );
+    """
+    conn.execute(test_table)
+
+    # Fill the table with content
+    books_content = """
+    INSERT INTO test_table (title, genres)
+    VALUES
+        ("First test", "Classics, Drama, Fiction"),
+        ("A new test", "Classics, Magic, Mythology"),
+        ("Another test", "Classics, Fantasy, Fiction");
+    """
+    conn.execute(books_content)
+
+    conn.commit()
+    conn.close()
+
+
 @pytest.fixture
 def created_admin_user() -> Users:
     db = TestingSessionLocal()
@@ -161,8 +197,8 @@ async def added_movie(
         "premiere": "2016-02-11",
         "score": 7.6,
         "genres": ["comedy", "Adventure", "Action"],
-        "overview": "The origin story of former Special Forces operative turned mercenary Wade Wilson, who, after being subjected to a rogue experiment that leaves him with accelerated healing powers, adopts the alter ego Deadpool. Armed with his new abilities and a dark, twisted sense of humor, Deadpool hunts down the man who nearly destroyed his life.",
-        "crew": "Ryan Reynolds, Wade Wilson / Deadpool, Morena Baccarin, Vanessa, Ed Skrein, Ajax, T.J. Miller, Weasel, Gina Carano, Angel Dust, Leslie Uggams, Blind Al, Brianna Hildebrand, Negasonic Teenage Warhead, Karan Soni, Dopinder, Jed Rees, Recruiter",
+        "overview": "The origin story of former Special Forces operative ....",
+        "crew": "Ryan Reynolds, Wade Wilson / Deadpool, ...",
         "orig_title": "Deadpool",
         "orig_lang": "English",
         "budget": 58000000,

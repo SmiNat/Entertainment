@@ -1,5 +1,6 @@
 import datetime
 import logging
+import os
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
@@ -11,7 +12,6 @@ from sqlalchemy.sql._typing import _TP
 from starlette import status
 
 from entertainment.database import get_db
-from entertainment.enums import MovieGenres
 from entertainment.exceptions import DatabaseIntegrityError, RecordNotFoundException
 from entertainment.models import Movies
 from entertainment.routers.auth import get_current_user
@@ -23,6 +23,7 @@ from entertainment.routers.utils import (
     check_language,
     convert_items_list_to_a_sorted_string,
     convert_list_to_unique_values,
+    get_unique_genres,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,10 @@ router = APIRouter(
 db_dependency = Annotated[Session, Depends(get_db)]
 user_dependency = Annotated[dict, Depends(get_current_user)]
 
-accessible_movie_genres = list(map(lambda genre: genre.value, MovieGenres))
+
+accessible_movie_genres = get_unique_genres(
+    os.environ.get("DEV_DATABASE_PATH"), "movies"
+)
 
 
 class MovieRequest(BaseModel):
@@ -71,7 +75,11 @@ class MovieRequest(BaseModel):
     @field_validator("genres")
     @classmethod
     def genres_are_valid_and_converted_to_a_string(cls, genres: list):
-        return check_items_list(genres, accessible_movie_genres)
+        return (
+            check_items_list(genres, accessible_movie_genres)
+            if isinstance(genres, list)
+            else genres
+        )
 
 
 class MovieResponse(MovieRequest):
@@ -210,11 +218,6 @@ async def search_movies(
 async def add_movie(
     db: db_dependency, user: user_dependency, movie_request: MovieRequest
 ):
-    if not user:
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED, "Could not validate credentials."
-        )
-
     movie = Movies(**movie_request.model_dump(), created_by=user.get("username"))
     genres = convert_items_list_to_a_sorted_string(movie_request.genres)
     movie.genres = genres

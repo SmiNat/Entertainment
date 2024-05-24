@@ -287,7 +287,7 @@ async def test_add_movie_422_not_unique_movie(
     async_client: AsyncClient,
     added_movie: dict,
     created_token: str,
-    invalid_title: dict,
+    invalid_title: str,
     comment: str,
     mock_get_movies_genres,
 ):
@@ -342,11 +342,21 @@ async def test_add_movie_422_invalid_input_data(
     assert error_msg in response.text
 
 
+@pytest.mark.parametrize(
+    "value, comment",
+    [
+        ("Deadpool", "valid title, the same as in db"),
+        ("deadpool", "valid title, lowercase"),
+        ("   Deadpool  ", "valid title, with whitespaces"),
+    ],
+)
 @pytest.mark.anyio
 async def test_update_movie_202(
     async_client: AsyncClient,
     added_movie: dict,
     created_user_token: tuple,
+    value: str,
+    comment: str,
 ):
     movie = added_movie
     assert movie["updated_by"] is None
@@ -354,10 +364,11 @@ async def test_update_movie_202(
     assert movie["orig_title"] == "Deadpool"
 
     user, token = created_user_token
+    title = value
     payload = {"score": 9.9, "orig_title": "Pool of death"}
 
     response = await async_client.patch(
-        "/movies/Deadpool/2016-02-11",
+        f"/movies/{title}/2016-02-11",
         json=payload,
         headers={"Authorization": f"Bearer {token}"},
     )

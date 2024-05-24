@@ -1,3 +1,4 @@
+import os
 from typing import Callable
 
 import pytest
@@ -12,10 +13,25 @@ from entertainment.routers.utils import (
     check_language,
     convert_items_list_to_a_sorted_string,
     convert_list_to_unique_values,
+    get_unique_genres,
     validate_field,
 )
 from entertainment.tests.utils_movies import create_movie
 from entertainment.tests.utils_users import create_db_user
+
+
+def test_get_unique_genres(database_genres):
+    test_path = os.environ.get("DEV_DATABASE_PATH")
+    table_name = "test_table"
+    expected_result = [
+        "Classics",
+        "Drama",
+        "Fantasy",
+        "Fiction",
+        "Magic",
+        "Mythology",
+    ]
+    assert expected_result == get_unique_genres(test_path, table_name)
 
 
 @pytest.mark.parametrize(

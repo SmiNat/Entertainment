@@ -8,6 +8,7 @@ from httpx import AsyncClient
 from entertainment.models import Books
 from entertainment.tests.conftest import TestingSessionLocal
 from entertainment.tests.utils_books import (
+    book_payload,
     check_if_db_books_table_is_not_empty,
     create_book,
 )
@@ -222,3 +223,187 @@ async def test_search_books_200_different_scenarios(
     logger.debug("Response: %s" % response.json())
     assert response.status_code == 200
     assert expected_response == response.json()
+
+
+@pytest.mark.anyio
+async def test_add_book_201(async_client: AsyncClient, created_token: str):
+    payload = {"title": "Test book", "author": "JD", "genres": ["fiction"]}
+    expected_response = {
+        "title": "Test book",
+        "author": "JD",
+        "genres": "Fiction",
+        "description": None,
+        "id": 1,
+        "avg_rating": None,
+        "num_ratings": None,
+        "first_published": None,
+        "created_by": "testuser",
+        "updated_by": None,
+    }
+    response = await async_client.post(
+        "/books/add",
+        json=payload,
+        headers={"Authorization": f"Bearer {created_token}"},
+    )
+    assert response.status_code == 201
+    assert expected_response == response.json()
+
+
+@pytest.mark.anyio
+async def test_add_book_401_if_not_authenticated(async_client: AsyncClient):
+    payload = {"title": "test book", "author": "JD", "genres": ["fiction"]}
+    response = await async_client.post("/books/add", json=payload)
+    assert response.status_code == 401
+    assert "Not authenticated" in response.content.decode()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "invalid_title, comment",
+    [
+        ("new book", "the same book title"),
+        ("New BOOK", "the same book title - case insensitive"),
+        (" New Book   ", "the same book title - stripped from whitespaces"),
+    ],
+)
+async def test_add_movie_422_not_unique_book(
+    async_client: AsyncClient,
+    created_token: str,
+    invalid_title: dict,
+    comment: str,
+    added_book: dict,
+):
+    """The user can only create a book with unique title and author."""
+    payload = {
+        "title": invalid_title,
+        "author": added_book["author"],
+        "genres": ["fantasy"],
+    }
+
+    response = await async_client.post(
+        "/books/add",
+        json=payload,
+        headers={"Authorization": f"Bearer {created_token}"},
+    )
+    assert response.status_code == 422
+    assert (
+        "Unique constraint failed: Record already exists in the database."
+        in response.json()["detail"]
+    )
+
+
+@pytest.mark.parametrize(
+    "payload, exp_response, status_code, comment",
+    [
+        (
+            {"title": "test", "author": None, "genres": ["fiction"]},
+            "Input should be a valid string",
+            422,
+            "missing required field",
+        ),
+        (
+            {"title": "test", "author": "JD", "genres": "fiction"},
+            "Input should be a valid list",
+            422,
+            "invalid genre data type",
+        ),
+        (
+            {"title": "test", "author": "JD", "genres": ["fiction"], "avg_rating": 7},
+            "Input should be less than or equal to 5",
+            422,
+            "rating out of range",
+        ),
+        (
+            {
+                "title": "test",
+                "author": "JD",
+                "genres": ["fiction"],
+                "num_ratings": 10.5,
+            },
+            "Input should be a valid integer",
+            422,
+            "invalid rating data type",
+        ),
+        (
+            {
+                "title": "test",
+                "author": "JD",
+                "genres": ["fiction"],
+                "first_published": "2022-22-22",
+            },
+            "Input should be a valid date or datetime",
+            422,
+            "invalid date",
+        ),
+    ],
+)
+@pytest.mark.anyio
+async def test_add_book_422_invalid_input_data(
+    async_client: AsyncClient,
+    created_token: str,
+    payload: dict,
+    exp_response: str,
+    status_code: int,
+    comment: str,
+    added_book: dict,
+):
+    response = await async_client.post(
+        "/books/add",
+        json=payload,
+        headers={"Authorization": f"Bearer {created_token}"},
+    )
+    assert response.status_code == status_code
+    assert exp_response in response.text
+
+
+@pytest.mark.parametrize(
+    "path_param, value, comment",
+    [
+        ("title", "New book", "valid title, the same as in db"),
+        ("title", "new book", "valid title, lowercase"),
+        ("title", "   New BOOK  ", "valid title, with whitespaces"),
+        ("author", "John Doe", "valid author, the same as in db"),
+        ("author", "john doe", "valid author, lowercase"),
+        ("author", "   john DOE  ", "valid author, with whitespaces"),
+    ],
+)
+@pytest.mark.anyio
+async def test_update_book_202(
+    async_client: AsyncClient,
+    created_user_token: tuple,
+    added_book: dict,
+    path_param: str,
+    value: str,
+    comment: str,
+):
+    user, token = created_user_token
+
+    title = value if path_param == "title" else added_book["title"]
+    author = value if path_param == "author" else added_book["author"]
+
+    payload = book_payload()
+    expected_result = {
+        "title": "Test Book",
+        "author": "John Doe",
+        "description": "Test description",
+        "genres": "Fantasy, Fiction",
+        "avg_rating": 4.5,
+        "num_ratings": 1000,
+        "first_published": "2011-11-11",
+        "created_by": user["username"],
+        "updated_by": user["username"],
+        "id": 1,
+    }
+
+    response = await async_client.patch(
+        f"/books/{title}/{author}",
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 202
+    assert expected_result == response.json()
+
+
+@pytest.mark.anyio
+async def test_update_book_401_if_not_authenticated():
+    assert False

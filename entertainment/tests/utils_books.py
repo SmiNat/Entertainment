@@ -10,7 +10,7 @@ def book_payload(
     title: str | None = "Test Book",
     author: str | None = "John Doe",
     description: str | None = "Test description",
-    genres: list[str] | None = ["Fantasy", "Fiction"],
+    genres: list[str] | None = ["Fantasy", "Fiction", "Fantasy"],
     avg_rating: float | None = 4.5,
     num_ratings: int | None = None,
     first_published: str | None = None,

@@ -1,18 +1,22 @@
 import datetime
 import logging
-import os  # noqa
+import os
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field, field_validator  # noqa
-from sqlalchemy import extract, or_, select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import extract, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from entertainment.database import get_db
+from entertainment.exceptions import DatabaseIntegrityError, RecordNotFoundException
 from entertainment.models import Books
 from entertainment.routers.auth import get_current_user
-from entertainment.routers.utils import (  # noqa
+from entertainment.routers.utils import (
+    check_if_author_or_admin,
     check_items_list,
+    convert_items_list_to_a_sorted_string,
     convert_list_to_unique_values,
     get_unique_genres,
 )
@@ -26,7 +30,6 @@ db_dependency = Annotated[Session, Depends(get_db)]
 user_dependency = Annotated[dict, Depends(get_current_user)]
 
 
-# accessible_movie_genres = get_books_genres()  # noqa: F821
 accessible_book_genres = get_unique_genres(os.environ.get("DEV_DATABASE_PATH"), "books")
 
 
@@ -36,25 +39,29 @@ class BookRequest(BaseModel):
     description: str | None = Field(default=None, examples=[None])
     genres: list[str]
     avg_rating: float | None = Field(
-        default=2.2,
+        default=None,
         ge=0,
         le=5,
-        description="Average rating from 'goodreads' score.",
+        description="Average rating from 'goodreads' score (from 0 to 5.0).",
     )
     num_ratings: int | None = Field(
         default=None, description="Number of rating scores."
     )
     first_published: datetime.date | None = Field(
-        default=None, description="YYYY-MM-DD format.", examples=["2022-22-10"]
+        default=None, description="YYYY-MM-DD format.", examples=["2022-10-10"]
     )
 
     class DictConfig:
         from_attributes = True
 
-    # @field_validator("genres")
-    # @classmethod
-    # def genres_are_valid_and_converted_to_a_string(cls, genres: list):
-    #     return check_items_list(genres, accessible_book_genres)
+    @field_validator("genres")
+    @classmethod
+    def genres_are_valid_and_converted_to_a_string(cls, genres: list):
+        return (
+            check_items_list(genres, accessible_book_genres)
+            if isinstance(genres, list)
+            else genres
+        )
 
 
 class BookResponse(BookRequest):
@@ -65,6 +72,12 @@ class BookResponse(BookRequest):
 
     class DictConfig:
         from_attributes = True
+
+
+class UpdateBookRequest(BookRequest):
+    title: str | None = Field(default=None)
+    author: str | None = Field(default=None)
+    genres: list[str] | None = Field(default=[None])
 
 
 @router.get("/genres", status_code=200, description="Get all available book genres.")
@@ -80,6 +93,7 @@ async def get_books_genres(db: db_dependency) -> list:
     "/all",
     status_code=200,
     response_model=list[BookResponse],
+    # response_model=None,
     response_model_exclude_none=True,
 )
 async def get_all_books(
@@ -151,4 +165,74 @@ async def search_books(
 
 @router.post("/add", status_code=201, response_model=BookResponse)
 async def add_book(user: user_dependency, db: db_dependency, new_book: BookRequest):
-    pass
+    book = Books(**new_book.model_dump(), created_by=user["username"])
+    genres = convert_items_list_to_a_sorted_string(new_book.genres)
+    book.genres = genres
+
+    try:
+        db.add(book)
+        db.commit()
+        db.refresh(book)
+    except IntegrityError:
+        raise DatabaseIntegrityError
+
+    logger.debug(
+        "Book: '%s' was successfully added to database by the '%s' user."
+        % (book.title, user["username"])
+    )
+    return book
+
+
+@router.patch("/{title}/{author}", status_code=status.HTTP_202_ACCEPTED)
+async def update_book(
+    title: str,
+    author: str,
+    db: db_dependency,
+    user: user_dependency,
+    book_update: UpdateBookRequest,
+):
+    logger.debug("Book to update: '%s' (%s)." % (title, author))
+
+    book = (
+        db.query(Books)
+        .filter(
+            func.lower(Books.title) == title.strip().casefold(),
+            func.lower(Books.author) == author.strip().casefold(),
+        )
+        .first()
+    )
+    if not book:
+        raise RecordNotFoundException(
+            extra_data=f"Searched book: '{title}', ({author})."
+        )
+
+    # Verify if user is authorized to update a book
+    check_if_author_or_admin(user, book)
+
+    fields_to_update = book_update.model_dump(exclude_none=True, exclude_unset=True)
+    if not fields_to_update:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="No data input provided."
+        )
+    logger.debug("Fields to update: %s" % fields_to_update)
+
+    for field, value in fields_to_update.items():
+        logger.debug("Updating: field: %s, value: %s" % (field, value))
+        if field == "genres":
+            setattr(book, field, convert_items_list_to_a_sorted_string(value))
+        else:
+            setattr(book, field, value)
+    book.updated_by = user["username"]
+
+    try:
+        db.commit()
+        db.refresh(book)
+    except IntegrityError:
+        raise DatabaseIntegrityError
+
+    logger.debug(
+        "Book '%s' (%s) was successfully updated by the '%s' user."
+        % (title, author, user["username"])
+    )
+
+    return book
