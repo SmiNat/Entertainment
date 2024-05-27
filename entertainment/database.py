@@ -40,12 +40,14 @@ def create_db_tables():
 def db_initial_data():
     # All data are from kaggle.com
     if os.path.exists(config.DATABASE_PATH):
-        if not (
-            sqlite3.connect(config.DATABASE_PATH)
-            .cursor()
-            .execute("SELECT count(*) FROM movies;")
-            .fetchone()[0]
-        ):
+        try:
+            (
+                sqlite3.connect(config.DATABASE_PATH)
+                .cursor()
+                .execute("SELECT count(*) FROM movies;")
+                .fetchone()[0]
+            )
+        except sqlite3.OperationalError:
             logger.info("#️⃣  No initial database content.")
             logger.info("➡️  Updating a database... (can take a while)")
             import entertainment.csv_converter as csv_converter  # noqa: F401

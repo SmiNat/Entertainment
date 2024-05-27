@@ -23,7 +23,7 @@ from entertainment.routers.utils import (
     check_language,
     convert_items_list_to_a_sorted_string,
     convert_list_to_unique_values,
-    get_unique_genres,
+    get_unique_row_data,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,8 +37,8 @@ db_dependency = Annotated[Session, Depends(get_db)]
 user_dependency = Annotated[dict, Depends(get_current_user)]
 
 
-accessible_movie_genres = get_unique_genres(
-    os.environ.get("DEV_DATABASE_PATH"), "movies"
+accessible_movie_genres = get_unique_row_data(
+    os.environ.get("DEV_DATABASE_PATH"), "movies", "genres"
 )
 
 

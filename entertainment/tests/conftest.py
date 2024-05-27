@@ -53,12 +53,12 @@ app.dependency_overrides[get_db] = override_get_db
 @pytest.fixture(autouse=True, scope="function")
 def clean_db():
     """Cleans db session for each test."""
-    db = TestingSessionLocal()
-    db.execute(text("DELETE FROM users"))
-    db.execute(text("DELETE FROM movies"))
-    db.execute(text("DELETE FROM books"))
-    db.commit()
-    db.close()
+    with TestingSessionLocal() as db:
+        db.execute(text("DELETE FROM users"))
+        db.execute(text("DELETE FROM movies"))
+        db.execute(text("DELETE FROM books"))
+        db.execute(text("DROP TABLE IF EXISTS test_table;"))
+        db.commit()
 
 
 # Overriding fixture pytest.mark.anyio to test async functions
@@ -111,14 +111,14 @@ def database_genres():
     conn.execute(test_table)
 
     # Fill the table with content
-    books_content = """
+    content = """
     INSERT INTO test_table (title, genres)
     VALUES
         ("First test", "Classics, Drama, Fiction"),
         ("A new test", "Classics, Magic, Mythology"),
         ("Another test", "Classics, Fantasy, Fiction");
     """
-    conn.execute(books_content)
+    conn.execute(content)
 
     conn.commit()
     conn.close()

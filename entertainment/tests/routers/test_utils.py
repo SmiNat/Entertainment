@@ -3,6 +3,7 @@ from typing import Callable
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import text
 
 from entertainment.routers.utils import (
     check_country,
@@ -13,14 +14,15 @@ from entertainment.routers.utils import (
     check_language,
     convert_items_list_to_a_sorted_string,
     convert_list_to_unique_values,
-    get_unique_genres,
+    get_unique_row_data,
     validate_field,
 )
+from entertainment.tests.conftest import TestingSessionLocal
 from entertainment.tests.utils_movies import create_movie
 from entertainment.tests.utils_users import create_db_user
 
 
-def test_get_unique_genres(database_genres):
+def test_get_unique_row_data_with_path_argument(database_genres):
     test_path = os.environ.get("DEV_DATABASE_PATH")
     table_name = "test_table"
     expected_result = [
@@ -31,7 +33,45 @@ def test_get_unique_genres(database_genres):
         "Magic",
         "Mythology",
     ]
-    assert expected_result == get_unique_genres(test_path, table_name)
+    assert expected_result == get_unique_row_data(test_path, table_name, "genres")
+
+
+def test_get_unique_row_data_with_session_argument():
+    # Creatina a 'test_table' with 'title' and 'genres' columns
+    new_table = """
+    CREATE TABLE test_table (
+    id      INTEGER     PRIMARY KEY,
+    title   VARCHAR,
+    genres  TEXT
+    );
+    """
+    new_content = """
+    INSERT INTO test_table (title, genres)
+    VALUES
+        ("First test", "Classics, Drama, Fiction"),
+        ("A new test", "Classics, Magic, Mythology"),
+        ("Another test", "Classics, Fantasy, Fiction");
+    """
+
+    # Using the same session for creating the table, inserting data, and testing
+    with TestingSessionLocal() as session:
+        # Creating table and inserting data
+        session.execute(text(new_table))
+        session.execute(text(new_content))
+        session.commit()
+
+        # Testing if get_unique_row_data will return expected result
+        table_name = "test_table"
+        expected_result = [
+            "Classics",
+            "Drama",
+            "Fantasy",
+            "Fiction",
+            "Magic",
+            "Mythology",
+        ]
+        result = get_unique_row_data(session, table_name, "genres")
+        assert sorted(expected_result) == sorted(result)
 
 
 @pytest.mark.parametrize(

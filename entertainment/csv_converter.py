@@ -83,7 +83,7 @@ create_table_query = """
         review_overall      VARCHAR,
         review_detailed     VARCHAR,
         reviews_number      INTEGER,
-        reviews_positive    VARCHAR,
+        reviews_positive    FLOAT,
         created_by          VARCHAR,
         updated_by          VARCHAR,
         UNIQUE(title, premiere, developer)
@@ -124,6 +124,7 @@ db_games_temp = {
         "DELETE FROM games_temp WHERE title LIKE '%???%';",
     ],
     "add columns": [
+        # "ALTER TABLE games_temp ADD COLUMN reviews_positive FLOAT;",
         "ALTER TABLE games_temp ADD COLUMN created_by VARCHAR;",
         "ALTER TABLE games_temp ADD COLUMN updated_by VARCHAR;",
     ],
@@ -161,6 +162,10 @@ db_games_temp = {
         SET created_by = "www.kaggle.com - rahuldabholkar"
         WHERE created_by is NULL;
         """,
+        """
+        UPDATE games_temp
+        SET percent_positive = CAST(REPLACE(percent_positive, '%', '') AS FLOAT) / 100;
+        """,
     ],
     "rename columns": [
         "ALTER TABLE games_temp RENAME COLUMN overall_review TO review_overall;",
@@ -172,6 +177,9 @@ db_games_temp = {
         "ALTER TABLE games_temp RENAME COLUMN dc_price TO price_discounted_eur;",
         "ALTER TABLE games_temp RENAME COLUMN reviews TO reviews_number;",
     ],
+    # "drop columns #2": [
+    #     "ALTER TABLE games_temp DROP COLUMN percent_positive;",
+    # ],
     "drop duplicate rows": [
         """
         DELETE FROM  games_temp
