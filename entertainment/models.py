@@ -96,7 +96,8 @@ class Books(Base):
     description = Column(Text)
     genres = Column(StrippedString, nullable=False)
     avg_rating = Column(Float)
-    rating_reviews = Column(Integer)
+    num_ratings = Column(Integer)
+    first_published = Column(Date)
     created_by = Column(StrippedString)
     updated_by = Column(StrippedString)
 

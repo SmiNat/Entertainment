@@ -1,5 +1,6 @@
 import logging
 import os
+import sqlite3
 from typing import AsyncGenerator, Generator
 from unittest.mock import patch
 
@@ -16,7 +17,7 @@ from entertainment.config import config  # noqa: E402
 from entertainment.database import Base, get_db  # noqa: E402
 from entertainment.enums import MovieGenres  # noqa: E402
 from entertainment.main import app  # noqa: E402
-from entertainment.models import Movies, Users  # noqa: E402
+from entertainment.models import Books, Movies, Users  # noqa: E402
 from entertainment.routers.auth import create_access_token  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,7 @@ def clean_db():
     db = TestingSessionLocal()
     db.execute(text("DELETE FROM users"))
     db.execute(text("DELETE FROM movies"))
+    db.execute(text("DELETE FROM books"))
     db.commit()
     db.close()
 
@@ -87,6 +89,41 @@ async def async_client(client) -> AsyncGenerator:
 
 
 # Some app fixtures to use in tests
+
+
+@pytest.fixture
+def database_genres():
+    test_path = os.environ.get("DEV_DATABASE_PATH")
+    conn = sqlite3.connect(test_path)
+
+    # Drop the table if it exists
+    drop_table = """DROP TABLE IF EXISTS test_table;"""
+    conn.execute(drop_table)
+
+    # Create a new table
+    test_table = """
+    CREATE TABLE test_table (
+    id      INTEGER     PRIMARY KEY,
+    title   VARCHAR,
+    genres  TEXT
+    );
+    """
+    conn.execute(test_table)
+
+    # Fill the table with content
+    books_content = """
+    INSERT INTO test_table (title, genres)
+    VALUES
+        ("First test", "Classics, Drama, Fiction"),
+        ("A new test", "Classics, Magic, Mythology"),
+        ("Another test", "Classics, Fantasy, Fiction");
+    """
+    conn.execute(books_content)
+
+    conn.commit()
+    conn.close()
+
+
 @pytest.fixture
 def created_admin_user() -> Users:
     db = TestingSessionLocal()
@@ -156,17 +193,17 @@ async def added_movie(
 ) -> dict:
     """Creates movie record in the database before running a test."""
     payload = {
-        "title": "Nigdy w życiu!",
-        "premiere": "2004-02-13",
-        "score": 6.2,
-        "genres": ["comedy", "romance"],
-        "overview": "Judyta po rozwodzie zaczyna budowę domu pod Warszawą i znajduje nową miłość.",
-        "crew": "Danuta Stenka, Judyta Kozłowska, Joanna Brodzik, Ula, Artur Żmijewski, Adam, Jan Frycz, Tomasz Kozłowski",
-        "original_title": "Nigdy w życiu!",
-        "original_language": "Polish",
-        "budget": None,
-        "revenue": None,
-        "country": "PL",
+        "title": "Deadpool",
+        "premiere": "2016-02-11",
+        "score": 7.6,
+        "genres": ["comedy", "Adventure", "Action"],
+        "overview": "The origin story of former Special Forces operative ....",
+        "crew": "Ryan Reynolds, Wade Wilson / Deadpool, ...",
+        "orig_title": "Deadpool",
+        "orig_lang": "English",
+        "budget": 58000000,
+        "revenue": 781947691,
+        "country": "AU",
     }
     await async_client.post(
         "/movies/add",
@@ -174,9 +211,42 @@ async def added_movie(
         headers={"Authorization": f"Bearer {created_token}"},
     )
     movie = (
-        TestingSessionLocal()
-        .query(Movies)
-        .filter(Movies.title == "Nigdy w życiu!")
-        .first()
+        TestingSessionLocal().query(Movies).filter(Movies.title == "Deadpool").first()
     )
     return jsonable_encoder(movie)
+
+
+@pytest.fixture
+def mock_get_books_genres():
+    with patch("entertainment.routers.books.get_books_genres") as mock_get_books_genres:
+        mock_get_books_genres.return_value = [
+            "Classics",
+            "Fantasy",
+            "Fiction",
+            "Magic",
+            "Psychology",
+        ]
+        yield mock_get_movies_genres
+
+
+@pytest.fixture()
+async def added_book(
+    async_client: AsyncClient, created_token: str, mock_get_books_genres
+) -> dict:
+    """Creates book record in the database before running a test."""
+    payload = {
+        "title": "New book",
+        "author": "John Doe",
+        "description": None,
+        "genres": ["classics", "romance"],
+        "avg_rating": 3.2,
+        "num_ratings": 1000,
+        "first_published": "2011-11-11",
+    }
+    await async_client.post(
+        "/books/add",
+        json=payload,
+        headers={"Authorization": f"Bearer {created_token}"},
+    )
+    book = TestingSessionLocal().query(Books).filter(Books.title == "New book").first()
+    return jsonable_encoder(book)

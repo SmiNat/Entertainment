@@ -25,7 +25,7 @@ def create_db_tables():
 
 
 # After creating the database, the app will check if the file with db exists
-# and is populated with data from kaggle.com csv files (our data directory).
+# and is populated with data from kaggle.com csv files (our external_data directory).
 # If there are no records in the database (at the initial setup) the app will run
 # the file csv_converter that converts csv files from our data directory
 # into desired database structure and then it will fill our db file with initial data.

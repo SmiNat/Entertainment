@@ -27,7 +27,7 @@ user_dependency = Annotated[dict, Depends(get_current_user)]
 
 
 class User(BaseModel):
-    username: str = Field(min_length=5, examples=["username"])
+    username: str = Field(min_length=5, examples=["username"], frozen=True)
     email: EmailStr
     first_name: str | None = Field(default=None, min_length=2, examples=[None])
     last_name: str | None = Field(default=None, min_length=2, examples=[None])

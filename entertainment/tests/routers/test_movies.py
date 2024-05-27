@@ -1,21 +1,12 @@
 import logging
 
 import pytest
-from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
 from httpx import AsyncClient
+from sqlalchemy import func
 
-from entertainment.models import Movies, Users  # noqa
-from entertainment.routers.movies import (
-    check_country,
-    check_date,
-    check_genres_list_and_convert_to_a_string,
-    check_language,
-)
-from entertainment.tests.conftest import (  # noqa
-    TestingSessionLocal,
-    override_get_db,
-)
+from entertainment.models import Movies
+from entertainment.tests.conftest import TestingSessionLocal
 from entertainment.tests.utils_movies import (
     check_if_db_movies_table_is_not_empty,
     create_movie,
@@ -26,81 +17,6 @@ from entertainment.tests.utils_users import create_user_and_token
 logger = logging.getLogger(__name__)
 
 # COMMAND = "pytest entertainment/tests/routers/test_movies.py -s --log-cli-level=DEBUG"
-
-
-def test_check_date():
-    invalid_date = "20-10-2020"
-    # Example test case where date is invalid
-    check_date("2020-10-20")
-
-    # Example test case where date is invalid
-    with pytest.raises(HTTPException) as exc_info:
-        check_date(invalid_date)
-    assert (
-        "Invalid date type. Enter date in 'YYYY-MM-DD' format." in exc_info.value.detail
-    )
-    assert exc_info.value.status_code == 422
-
-
-def test_check_genres_list_and_convert_to_a_string():
-    # Example test case where genres are valid
-    response = check_genres_list_and_convert_to_a_string(["action", "war", "comedy"])
-    assert response == "Action, Comedy, War"
-
-    # Example test case where genres are invalid
-    with pytest.raises(HTTPException) as exc_info:
-        check_genres_list_and_convert_to_a_string(["romance", "history", "statistics"])
-    assert exc_info.value.status_code == 422
-    assert (
-        "Invalid genre: check 'get movies genres' for list of accessible genres"
-        in exc_info.value.detail
-    )
-
-    # Example test case with list of empty records
-    response = check_genres_list_and_convert_to_a_string([None, None])
-    assert response is None
-
-
-@pytest.mark.parametrize(
-    "valid_data", [("pl"), ("pol"), ("Poland"), ("poland"), ("   poland")]
-)
-def test_check_country_with_valid_data(valid_data: str):
-    print(valid_data)
-    response = check_country(valid_data)
-    assert response == "PL"
-
-
-def test_check_country_with_invalid_data():
-    with pytest.raises(HTTPException) as exc_info:
-        check_country("invalid_country")
-    assert exc_info.value.status_code == 422
-    assert "Invalid country name. Available country names:" in exc_info.value.detail
-
-
-def test_check_country_with_empty_data():
-    response = check_country(None)
-    assert response is None
-
-
-@pytest.mark.parametrize(
-    "valid_data", [("pl"), ("pol"), ("polish"), ("Polish"), ("   polish")]
-)
-def test_check_language_with_valid_data(valid_data: str):
-    print(valid_data)
-    response = check_language(valid_data)
-    assert response == "Polish"
-
-
-def test_check_language_with_invalid_data():
-    with pytest.raises(HTTPException) as exc_info:
-        check_language("polnish")
-    assert exc_info.value.status_code == 422
-    assert "Invalid language name. Available languages:" in exc_info.value.detail
-
-
-def test_check_language_with_empty_data():
-    response = check_language(None)
-    assert response is None
 
 
 @pytest.mark.anyio
@@ -116,7 +32,7 @@ async def test_get_movies_genres_non_empty_db(async_client: AsyncClient):
     create_movie(title="First Movie", genres=["comedy"])
     create_movie(title="Second Movie", genres=["comedy", "music", "family"])
     create_movie(title="Third Movie", genres="drama")
-    expected_result = ["comedy", "drama", "family", "music"]
+    expected_result = ["Comedy", "Drama", "Family", "Music"]
 
     # Making the request to the endpoint
     response = await async_client.get("/movies/genres")
@@ -125,18 +41,7 @@ async def test_get_movies_genres_non_empty_db(async_client: AsyncClient):
 
 
 @pytest.mark.anyio
-async def test_get_all_movies_empty_db(async_client: AsyncClient):
-    response = await async_client.get("/movies/all")
-    expected_result = {
-        "number of movies": 0,
-        "movies": [],
-    }
-    assert response.status_code == 200
-    assert expected_result == response.json()
-
-
-@pytest.mark.anyio
-async def test_get_all_movies_non_empty_db(async_client: AsyncClient):
+async def test_get_all_movies_200_non_empty_db(async_client: AsyncClient):
     movie1 = create_movie(title="First Movie", score=9.2, genres=["comedy"])
     movie2 = create_movie(title="Second Movie", orig_title="sec. movie")
     movie3 = create_movie(score=2.7, premiere="2023-03-02", genres="drama")
@@ -156,13 +61,20 @@ async def test_get_all_movies_non_empty_db(async_client: AsyncClient):
 
 
 @pytest.mark.anyio
+async def test_get_all_movies_404_empty_db(async_client: AsyncClient):
+    response = await async_client.get("/movies/all")
+    assert response.status_code == 404
+    assert "Movies not found" in response.json()["detail"]
+
+
+@pytest.mark.anyio
 async def test_get_all_movies_pagination(async_client: AsyncClient):
     # Creating 3 movies in db with titles: "1", "2", "3"
     for x in range(1, 4):
         create_movie(title=str(x))
 
     # Making the request to the endpoint with page size and page number - empty page
-    params = {"page_size": 10, "page": 2}
+    params = {"page_size": 10, "page_number": 2}
     expected_result = {
         "number of movies": 3,
         "movies": [],
@@ -172,7 +84,7 @@ async def test_get_all_movies_pagination(async_client: AsyncClient):
     assert expected_result == response.json()
 
     # Making the request to the endpoint with page size and page number - page with movies
-    params = {"page_size": 1, "page": 3}
+    params = {"page_size": 1, "page_number": 3}
     expected_result = {
         "number of movies": 3,
         "movies": [
@@ -182,13 +94,13 @@ async def test_get_all_movies_pagination(async_client: AsyncClient):
                 "overview": None,
                 "orig_title": None,
                 "budget": None,
-                "country": "US",
+                "country": "ES",
                 "updated_by": None,
                 "premiere": "2011-11-11",
                 "title": "3",
-                "genres": "Action",
+                "genres": "Action, Mystery",
                 "crew": "Test crew",
-                "orig_lang": "English",
+                "orig_lang": "Spanish",
                 "revenue": None,
                 "created_by": "John_Doe",
             }
@@ -197,6 +109,12 @@ async def test_get_all_movies_pagination(async_client: AsyncClient):
     response = await async_client.get("/movies/all", params=params)
     assert response.status_code == 200
     assert expected_result == response.json()
+
+    # Page size out of range
+    params = {"page_size": 222, "page_number": 3}
+    response = await async_client.get("/movies/all", params=params)
+    assert response.status_code == 422
+    assert "Input should be less than or equal to 100" in response.text
 
 
 @pytest.mark.anyio
@@ -213,14 +131,25 @@ async def test_search_movies_empty_db(async_client: AsyncClient):
 @pytest.mark.anyio
 async def test_search_movies_non_empty_db(async_client: AsyncClient):
     movie1 = create_movie(title="First Movie", score=9.2, genres=["comedy", "action"])
-    movie2 = create_movie(title="Second Movie", orig_title="sec. movie")
+    movie2 = create_movie(score=None, title="Second Movie", orig_title="sec. movie")
     movie3 = create_movie(score=2.7, premiere="2023-03-02", genres=["drama", "comedy"])
 
-    # score >= 9.0
-    response = await async_client.get("/movies/search", params={"score_ge": 9.0})
+    # score >= 9.0 with exclude_empty_data = True
+    response = await async_client.get(
+        "/movies/search", params={"score_ge": 9.0, "exclude_empty_data": True}
+    )
     expected_result = {
         "number of movies": 1,
         "movies": [jsonable_encoder(movie1)],
+    }
+    assert response.status_code == 200
+    assert expected_result == response.json()
+
+    # score >= 9.0 with exclude_empty_data = False
+    response = await async_client.get("/movies/search", params={"score_ge": 9.0})
+    expected_result = {
+        "number of movies": 2,
+        "movies": [jsonable_encoder(movie1), jsonable_encoder(movie2)],
     }
     assert response.status_code == 200
     assert expected_result == response.json()
@@ -350,21 +279,21 @@ async def test_add_movie_401_if_not_authenticated(
 @pytest.mark.parametrize(
     "invalid_title, comment",
     [
-        ("Nigdy w życiu!", "the same movie title"),
-        ("nigdy W życiu!", "the same movie title - case insensitive"),
-        (" Nigdy w życiu!   ", "the same movie title - stripped from whitespaces"),
+        ("Deadpool", "the same movie title"),
+        ("deadpool", "the same movie title - case insensitive"),
+        (" deadpool   ", "the same movie title - stripped from whitespaces"),
     ],
 )
 async def test_add_movie_422_not_unique_movie(
     async_client: AsyncClient,
     added_movie: dict,
     created_token: str,
-    invalid_title: dict,
+    invalid_title: str,
     comment: str,
     mock_get_movies_genres,
 ):
     """The user can only create a movie with unique title and premiere date."""
-    payload = movie_payload(title=invalid_title, premiere="2004-02-13")
+    payload = movie_payload(title=invalid_title, premiere=added_movie["premiere"])
 
     response = await async_client.post(
         "/movies/add",
@@ -373,8 +302,8 @@ async def test_add_movie_422_not_unique_movie(
     )
     assert response.status_code == 422
     assert (
-        f"Unique constraint failed: a movie '{invalid_title}' is already registered in the database."
-        in response.json()["detail"]
+        "Unique constraint failed. A movie with that title and that premiere date "
+        "already exists in the database." in response.json()["detail"]
     )
 
 
@@ -392,7 +321,7 @@ async def test_add_movie_422_not_unique_movie(
         ({"orig_lang": "invalid"}, "Invalid language name"),
         (
             {"genres": ["invalid", "genre"]},
-            "Invalid genre: check 'get movies genres' for list of accessible genres",
+            "Invalid genre: check 'get genres' for list of accessible genres",
         ),
     ],
 )
@@ -414,22 +343,33 @@ async def test_add_movie_422_invalid_input_data(
     assert error_msg in response.text
 
 
+@pytest.mark.parametrize(
+    "value, comment",
+    [
+        ("Deadpool", "valid title, the same as in db"),
+        ("deadpool", "valid title, lowercase"),
+        ("   Deadpool  ", "valid title, with whitespaces"),
+    ],
+)
 @pytest.mark.anyio
 async def test_update_movie_202(
     async_client: AsyncClient,
     added_movie: dict,
     created_user_token: tuple,
+    value: str,
+    comment: str,
 ):
     movie = added_movie
     assert movie["updated_by"] is None
-    assert movie["score"] == 6.2
-    assert movie["orig_title"] == "Nigdy w życiu!"
+    assert movie["score"] == 7.6
+    assert movie["orig_title"] == "Deadpool"
 
     user, token = created_user_token
-    payload = {"score": 9.9, "original title": "Never, ever!"}
+    title = value
+    payload = {"score": 9.9, "orig_title": "Pool of death"}
 
     response = await async_client.patch(
-        "/movies/Nigdy w życiu!/2004-02-13",
+        f"/movies/{title}/2016-02-11",
         json=payload,
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -442,11 +382,9 @@ async def test_update_movie_202(
 async def test_update_movie_401_if_not_authenticated(
     async_client: AsyncClient, added_movie: dict, mock_get_movies_genres
 ):
-    payload = {"score": 9.9, "original title": "Never, ever!"}
+    payload = {"score": 9.9, "original title": "Pool of death"}
 
-    response = await async_client.patch(
-        "/movies/Nigdy w życiu!/2004-02-13", json=payload
-    )
+    response = await async_client.patch("/movies/Deadpool/2016-02-11", json=payload)
     assert response.status_code == 401
     assert "Not authenticated" in response.content.decode()
 
@@ -455,16 +393,16 @@ async def test_update_movie_401_if_not_authenticated(
 async def test_update_movie_404_movie_not_found(
     async_client: AsyncClient, created_token: str
 ):
-    payload = {"score": 9.9, "original title": "Never, ever!"}
+    payload = {"score": 9.9, "original title": "Pool of death"}
 
     response = await async_client.patch(
-        "/movies/Nigdy w życiu!/2004-02-13",
+        "/movies/Deadpool/2016-02-11",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 404
     assert (
-        "Movie 'Nigdy w życiu!' (2004-02-13) not found in the database."
+        "The record was not found in the database. Searched movie: 'Deadpool' (2016-02-11)."
         in response.json()["detail"]
     )
 
@@ -487,7 +425,11 @@ async def test_update_movie_202_update_by_the_admin(
         role="admin",
     )
 
-    payload = {"title": "Updated Movie", "premiere": "2022-01-01"}
+    payload = {
+        "title": "Updated Movie",
+        "premiere": "2022-01-01",
+        "genres": ["comedy", "war", "Comedy", "action"],
+    }
 
     response = await async_client.patch(
         "/movies/Test Movie/2011-11-11",
@@ -516,14 +458,14 @@ async def test_update_movie_403_update_by_the_user_who_is_not_the_movie_creator(
     )
     assert response.status_code == 403
     assert (
-        "Only a user with the 'admin' role or the author of the movie record can update the movie"
-        in response.text
+        "Only a user with the 'admin' role or the author of the database record "
+        "can change or delete the record from the database" in response.text
     )
 
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(
-    "title, error_info",
+    "title, comment",
     [
         ("Test Movie", "the same title and premiere as already registered movie"),
         (
@@ -541,7 +483,7 @@ async def test_update_movie_422_not_unique_movie(
     added_movie: dict,
     created_token: str,
     title: str,
-    error_info: str,
+    comment: str,
 ):
     """Update cannot allow changes in title and premiere so that it could indicate
     to already existing movie in the database.
@@ -549,18 +491,18 @@ async def test_update_movie_422_not_unique_movie(
     # Creating other movie record in db (with the title of 'Test Movie' and premiere at 2011-11-11)
     create_movie()
 
-    # Calling the endpoint with attempt to change the 'Nigdy w życiu!'
+    # Calling the endpoint with attempt to change the 'Deadpool'
     # movie title and premiere to the same as already existing one
     # (created by create_movie func)
     response = await async_client.patch(
-        "/movies/Nigdy w życiu!/2004-02-13",
+        "/movies/Deadpool/2016-02-11",
         json={"title": title, "premiere": "2011-11-11"},
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 422
     assert (
-        "Unique constraint failed: a movie with the same title and premiere "
-        "date is already registered in the database." in response.json()["detail"]
+        "Unique constraint failed. A movie with that title and that premiere date "
+        "already exists in the database." in response.json()["detail"]
     )
 
 
@@ -582,7 +524,7 @@ async def test_update_movie_400_if_no_data_to_change(
     payload = invalid_payload
 
     response = await async_client.patch(
-        "/movies/Nigdy w życiu!/2004-02-13",
+        "/movies/{0}/{1}".format(added_movie["title"], added_movie["premiere"]),
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -598,11 +540,11 @@ async def test_update_movie_400_if_no_data_to_change(
         ({"premiere": "11-11-2011"}, "Input should be a valid date or datetime"),
         ({"revenue": "100k"}, "Input should be a valid number"),
         ({"country": "san escobar"}, "Invalid country name"),
-        ({"original_language": "invalid"}, "Invalid language name"),
+        ({"orig_lang": "invalid"}, "Invalid language name"),
         ({"genres": "invalid, drama"}, "Input should be a valid list"),
         (
             {"genres": ["invalid", "genre"]},
-            "Invalid genre: check 'get movies genres' for list of accessible genres",
+            "Invalid genre: check 'get genres' for list of accessible genres",
         ),
     ],
 )
@@ -616,7 +558,7 @@ async def test_update_movie_422_incorrect_update_data(
     payload = invalid_payload
 
     response = await async_client.patch(
-        "/movies/Nigdy w życiu!/2004-02-13",
+        "/movies/Deadpool/2016-02-11",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -635,7 +577,10 @@ async def test_delete_movie_204(
     movie = (
         TestingSessionLocal()
         .query(Movies)
-        .filter(Movies.premiere == "2004-02-13", Movies.title == "Nigdy w życiu!")
+        .filter(
+            Movies.premiere == added_movie["premiere"],
+            func.lower(Movies.title) == added_movie["title"].lower().casefold(),
+        )
         .first()
     )
     assert movie is not None
@@ -643,17 +588,14 @@ async def test_delete_movie_204(
 
     # Calling the endpoint
     response = await async_client.delete(
-        "/movies/Nigdy w życiu!/2004-02-13",
+        "/movies/{0}/{1}".format(added_movie["title"], added_movie["premiere"]),
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 204
 
     # Checking if the movie no longer exists in db
     movie = (
-        TestingSessionLocal()
-        .query(Movies)
-        .filter(Movies.title == "Nigdy w życiu!")
-        .first()
+        TestingSessionLocal().query(Movies).filter(Movies.title == "Deadpool").first()
     )
     assert movie is None
 
@@ -668,7 +610,7 @@ async def test_delete_movie_401_if_not_authenticated(
     movie = (
         TestingSessionLocal()
         .query(Movies)
-        .filter(Movies.premiere == "2004-02-13", Movies.title == "Nigdy w życiu!")
+        .filter(Movies.premiere == "2016-02-11", Movies.title == "Deadpool")
         .first()
     )
     assert movie is not None
@@ -676,17 +618,14 @@ async def test_delete_movie_401_if_not_authenticated(
 
     # Calling the endpoint
     response = await async_client.delete(
-        "/movies/Nigdy w życiu!/2004-02-13",
+        "/movies/Deadpool/2016-02-11",
     )
     assert response.status_code == 401
     assert "Not authenticated" in response.content.decode()
 
     # Checking if the movie still exists in db
     movie = (
-        TestingSessionLocal()
-        .query(Movies)
-        .filter(Movies.title == "Nigdy w życiu!")
-        .first()
+        TestingSessionLocal().query(Movies).filter(Movies.title == "Deadpool").first()
     )
     assert movie is not None
 
@@ -744,8 +683,8 @@ async def test_delete_movie_403_delete_by_the_user_who_is_not_the_movie_creator(
     )
     assert response.status_code == 403
     assert (
-        "Only a user with the 'admin' role or the author of the movie record can delete the movie"
-        in response.json()["detail"]
+        "Only a user with the 'admin' role or the author of the database record "
+        "can change or delete the record from the database" in response.json()["detail"]
     )
 
     # Checking if the movie still exists in db
@@ -765,6 +704,6 @@ async def test_delete_movie_404_movie_not_found(
     )
     assert response.status_code == 404
     assert (
-        "Movie 'deadpool' (2004-02-13) not found in the database."
+        "The record was not found in the database. Searched movie: 'deadpool' (2004-02-13)"
         in response.json()["detail"]
     )
