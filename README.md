@@ -16,21 +16,25 @@ Initial data source: [kaggle.com](https://www.kaggle.com/).
     the application. After that FastAPI will use the same database to read, add,
     update and delete records.
 
-    Note:
+    **Note:**
+
     At the first app launch, the csv_converter.py file will be used to create
     database file with tables filled with processed data from kaggle.com selected csv files.
+
     The original data are from:
     - https://www.kaggle.com/datasets/ishikajohari/best-books-10k-multi-genre-data (table: books)
     - https://www.kaggle.com/datasets/rahuldabholkar/steam-pc-games (table: games)
     - https://www.kaggle.com/datasets/ashpalsingh1525/imdb-movies-dataset (table: movies)
     - https://www.kaggle.com/datasets/joebeachcapital/30000-spotify-songs?select=spotify_songs.csv (table: songs)
+
     Some of the data was changed or deleted from the final database table.
     All changes were made in the csv_converter file.
 
     Because the project uses SQLite as the primary database, some data originally in the form of
     a list was converted to a string type, with values of which are separated by commas.
 
-    Handling db-journal error:
+    **Handling db-journal error:**
+
     If by any chance an error concerning 'db-journal', such as:
     [*_rust_notify.WatchfilesRustInternalError: error in underlying watcher:
     IO error for operation on /.../entertainment.db-journal: No such file or directory*]
