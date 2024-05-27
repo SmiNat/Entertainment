@@ -97,6 +97,8 @@ def convert_items_list_to_a_sorted_string(items: list[str]) -> str | None:
     if not items:
         return None
     items = list(set(items))
+    if items == [None]:
+        return None
     items.sort()
     items_string = ", ".join(items)
     return items_string

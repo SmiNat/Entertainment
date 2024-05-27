@@ -227,7 +227,9 @@ async def add_movie(
         db.commit()
         db.refresh(movie)
     except IntegrityError:
-        raise DatabaseIntegrityError
+        raise DatabaseIntegrityError(
+            extra_data="A movie with that title and that premiere date already exists in the database."
+        )
 
     logger.debug(
         "Movie: '%s' was successfully added to database by the '%s' user."
@@ -243,7 +245,7 @@ async def update_movie(
     user: user_dependency,
     movie_update: UpdateMovieRequest,
     title: str,
-    premiere: str = Path(description="Use YYYY-MM-DD, eg. 2024-07-12."),
+    premiere: datetime.date = Path(description="Use YYYY-MM-DD, eg. 2024-07-12."),
 ):
     """Update movie - endpoint available for user who created a movie record or for an admin user."""
 
@@ -283,7 +285,9 @@ async def update_movie(
         db.commit()
         db.refresh(movie)
     except IntegrityError:
-        raise DatabaseIntegrityError
+        raise DatabaseIntegrityError(
+            extra_data="A movie with that title and that premiere date already exists in the database."
+        )
 
     logger.debug(
         "Movie '%s' (%s) was successfully updated by the '%s' user."

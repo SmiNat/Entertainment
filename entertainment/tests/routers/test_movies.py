@@ -3,6 +3,7 @@ import logging
 import pytest
 from fastapi.encoders import jsonable_encoder
 from httpx import AsyncClient
+from sqlalchemy import func
 
 from entertainment.models import Movies
 from entertainment.tests.conftest import TestingSessionLocal
@@ -301,8 +302,8 @@ async def test_add_movie_422_not_unique_movie(
     )
     assert response.status_code == 422
     assert (
-        "Unique constraint failed: Record already exists in the database."
-        in response.json()["detail"]
+        "Unique constraint failed. A movie with that title and that premiere date "
+        "already exists in the database." in response.json()["detail"]
     )
 
 
@@ -464,7 +465,7 @@ async def test_update_movie_403_update_by_the_user_who_is_not_the_movie_creator(
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(
-    "title, error_info",
+    "title, comment",
     [
         ("Test Movie", "the same title and premiere as already registered movie"),
         (
@@ -482,7 +483,7 @@ async def test_update_movie_422_not_unique_movie(
     added_movie: dict,
     created_token: str,
     title: str,
-    error_info: str,
+    comment: str,
 ):
     """Update cannot allow changes in title and premiere so that it could indicate
     to already existing movie in the database.
@@ -500,8 +501,8 @@ async def test_update_movie_422_not_unique_movie(
     )
     assert response.status_code == 422
     assert (
-        "Unique constraint failed: Record already exists in the database."
-        in response.json()["detail"]
+        "Unique constraint failed. A movie with that title and that premiere date "
+        "already exists in the database." in response.json()["detail"]
     )
 
 
@@ -523,7 +524,7 @@ async def test_update_movie_400_if_no_data_to_change(
     payload = invalid_payload
 
     response = await async_client.patch(
-        "/movies/Deadpool/2016-02-11",
+        "/movies/{0}/{1}".format(added_movie["title"], added_movie["premiere"]),
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -576,7 +577,10 @@ async def test_delete_movie_204(
     movie = (
         TestingSessionLocal()
         .query(Movies)
-        .filter(Movies.premiere == "2016-02-11", Movies.title == "Deadpool")
+        .filter(
+            Movies.premiere == added_movie["premiere"],
+            func.lower(Movies.title) == added_movie["title"].lower().casefold(),
+        )
         .first()
     )
     assert movie is not None
@@ -584,7 +588,7 @@ async def test_delete_movie_204(
 
     # Calling the endpoint
     response = await async_client.delete(
-        "/movies/Deadpool/2016-02-11",
+        "/movies/{0}/{1}".format(added_movie["title"], added_movie["premiere"]),
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 204

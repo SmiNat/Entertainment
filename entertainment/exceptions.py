@@ -23,13 +23,12 @@ class DatabaseIntegrityError(HTTPException):
     def __init__(
         self,
         status_code: int = status.HTTP_422_UNPROCESSABLE_ENTITY,
-        detail: str | None = None,
+        detail: str = "Unique constraint failed.",
+        extra_data: str | None = None,
         headers: dict[str, str] | None = {"WWW-Authenticate": "Bearer"},
     ) -> None:
         self.status_code = status_code
-        self.detail = (
-            "Unique constraint failed: " + self.DETAIL if not detail else detail
-        )
+        self.detail = detail if not extra_data else detail + " " + extra_data
         self.headers = headers
 
 

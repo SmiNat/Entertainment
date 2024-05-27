@@ -75,9 +75,11 @@ class BookResponse(BookRequest):
 
 
 class UpdateBookRequest(BookRequest):
-    title: str | None = Field(default=None)
-    author: str | None = Field(default=None)
-    genres: list[str] | None = Field(default=[None])
+    title: str | None = Field(default=None, examples=[None])
+    author: str | None = Field(default=None, examples=[None])
+    genres: list[str | None] | None = Field(
+        default=[None], examples=[[None, None]], description="Provide genres as a list."
+    )
 
 
 @router.get("/genres", status_code=200, description="Get all available book genres.")
@@ -174,7 +176,9 @@ async def add_book(user: user_dependency, db: db_dependency, new_book: BookReque
         db.commit()
         db.refresh(book)
     except IntegrityError:
-        raise DatabaseIntegrityError
+        raise DatabaseIntegrityError(
+            extra_data="A book with that title and that author already exists in the database."
+        )
 
     logger.debug(
         "Book: '%s' was successfully added to database by the '%s' user."
@@ -203,7 +207,7 @@ async def update_book(
     )
     if not book:
         raise RecordNotFoundException(
-            extra_data=f"Searched book: '{title}', ({author})."
+            extra_data=f"Searched book: '{title}', (by {author})."
         )
 
     # Verify if user is authorized to update a book
@@ -228,7 +232,9 @@ async def update_book(
         db.commit()
         db.refresh(book)
     except IntegrityError:
-        raise DatabaseIntegrityError
+        raise DatabaseIntegrityError(
+            extra_data="A book with that title and that author already exists in the database."
+        )
 
     logger.debug(
         "Book '%s' (%s) was successfully updated by the '%s' user."
@@ -236,3 +242,34 @@ async def update_book(
     )
 
     return book
+
+
+@router.delete("/{title}/{author}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_book(
+    db: db_dependency, user: user_dependency, title: str, author: str
+):
+    logger.debug("Book to delete: '%s' (by %s)." % (title, author))
+
+    book = (
+        db.query(Books)
+        .filter(
+            func.lower(Books.title) == title.lower().casefold(),
+            func.lower(Books.author) == author.lower().casefold(),
+        )
+        .first()
+    )
+    if not book:
+        raise RecordNotFoundException(
+            extra_data=f"Searched book: '{title}', (by {author})."
+        )
+
+    # Verify if user is authorized to update a book
+    check_if_author_or_admin(user, book)
+
+    db.delete(book)
+    db.commit()
+
+    logger.debug(
+        "Book '%s' (by %s) was successfully deleted by the '%s' user."
+        % (title, author, user["username"])
+    )

@@ -4,6 +4,7 @@ import logging
 import pytest
 from fastapi.encoders import jsonable_encoder
 from httpx import AsyncClient
+from sqlalchemy import func
 
 from entertainment.models import Books
 from entertainment.tests.conftest import TestingSessionLocal
@@ -12,6 +13,7 @@ from entertainment.tests.utils_books import (
     check_if_db_books_table_is_not_empty,
     create_book,
 )
+from entertainment.tests.utils_users import create_user_and_token
 
 logger = logging.getLogger(__name__)
 
@@ -287,7 +289,7 @@ async def test_add_movie_422_not_unique_book(
     )
     assert response.status_code == 422
     assert (
-        "Unique constraint failed: Record already exists in the database."
+        "Unique constraint failed. A book with that title and that author already exists in the database."
         in response.json()["detail"]
     )
 
@@ -405,5 +407,314 @@ async def test_update_book_202(
 
 
 @pytest.mark.anyio
-async def test_update_book_401_if_not_authenticated():
-    assert False
+async def test_update_book_401_if_not_authenticated(
+    async_client: AsyncClient, added_book: dict
+):
+    payload = book_payload()
+    response = await async_client.patch(
+        "/books/{0}/{1}".format(added_book["title"], added_book["author"]), json=payload
+    )
+    assert response.status_code == 401
+    assert "Not authenticated" in response.text
+
+
+@pytest.mark.anyio
+async def test_update_book_404_if_book_not_found(
+    async_client: AsyncClient, added_book: dict, created_token: str
+):
+    invalid_title = {"title": "invalid", "author": added_book["author"]}
+    invalid_author = {"title": added_book["title"], "author": "invalid"}
+    invalid_data = [invalid_title, invalid_author]
+
+    for element in invalid_data:
+        response = await async_client.patch(
+            "/books/{0}/{1}".format(element["title"], element["author"]),
+            json={"avg_rating": 1.1},
+            headers={"Authorization": f"Bearer {created_token}"},
+        )
+        assert response.status_code == 404
+        assert (
+            "The record was not found in the database. Searched book: '{0}', (by {1}).".format(
+                element["title"], element["author"]
+            )
+            in response.json()["detail"]
+        )
+
+
+@pytest.mark.anyio
+async def test_update_book_202_update_by_the_record_creator(
+    async_client: AsyncClient, added_book: dict, created_user_token: str
+):
+    user, token = created_user_token
+    assert added_book["created_by"] == user["username"]
+    assert added_book["avg_rating"] != 1.1
+    assert added_book["updated_by"] != user["username"]
+
+    response = await async_client.patch(
+        "/books/{0}/{1}".format(added_book["title"], added_book["author"]),
+        json={"avg_rating": 1.1},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 202
+    assert response.json()["avg_rating"] == 1.1
+    assert response.json()["updated_by"] == user["username"]
+
+
+@pytest.mark.anyio
+async def test_update_book_202_update_by_the_admin(
+    async_client: AsyncClient, added_book: dict, created_user_token: str
+):
+    admin_user, token = create_user_and_token(
+        "admin_user", "admin@example.com", "password", "admin"
+    )
+    assert added_book["created_by"] != "admin_user"
+    assert added_book["avg_rating"] != 1.1
+    assert added_book["updated_by"] != "admin_user"
+
+    response = await async_client.patch(
+        "/books/{0}/{1}".format(added_book["title"], added_book["author"]),
+        json={"avg_rating": 1.1},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 202
+    assert response.json()["avg_rating"] == 1.1
+    assert response.json()["updated_by"] == "admin_user"
+
+
+@pytest.mark.anyio
+async def test_update_book_403_update_by_the_user_who_is_not_the_movie_creator(
+    async_client: AsyncClient, added_book: dict, created_user_token: str
+):
+    some_user, token = create_user_and_token(
+        "some_user", "user@example.com", "password", "user"
+    )
+    assert added_book["created_by"] != "some_user"
+    assert added_book["avg_rating"] != 1.1
+
+    response = await async_client.patch(
+        "/books/{0}/{1}".format(added_book["title"], added_book["author"]),
+        json={"avg_rating": 1.1},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 403
+    assert (
+        "Only a user with the 'admin' role or the author of the "
+        "database record can change or delete the record from the database"
+        in response.text
+    )
+
+
+@pytest.mark.parametrize(
+    "new_title, new_author, comment",
+    [
+        ("Test book", "JD", "the same title and author as of already existing book"),
+        ("test book", "jd", "lowercase title and author as of already existing book"),
+        (
+            "    Test book  ",
+            "  JD   ",
+            "whitespaced title and author as of already existing book",
+        ),
+    ],
+)
+@pytest.mark.anyio
+async def test_update_book_422_not_unique_book(
+    async_client: AsyncClient,
+    created_token: str,
+    added_book: dict,
+    new_title: str,
+    new_author: str,
+    comment: str,
+):
+    some_existing_book = create_book(title="Test book", author="JD")
+    assert some_existing_book.title != added_book["title"]
+    assert some_existing_book.title != added_book["author"]
+
+    payload = {"title": new_title, "author": new_author}
+
+    response = await async_client.patch(
+        "/books/{0}/{1}".format(added_book["title"], added_book["author"]),
+        json=payload,
+        headers={"Authorization": f"Bearer {created_token}"},
+    )
+    assert response.status_code == 422
+    assert (
+        "Unique constraint failed. A book with that title and that author already exists in the database."
+        in response.text
+    )
+
+
+@pytest.mark.parametrize(
+    "invalid_payload, comment",
+    [
+        ({"genres": [None, None]}, "empty genres list"),
+        ({}, "nothing to change"),
+    ],
+)
+@pytest.mark.anyio
+async def test_update_book_400_if_no_data_to_change(
+    async_client: AsyncClient,
+    created_token: str,
+    added_book: dict,
+    invalid_payload: dict,
+    comment: str,
+):
+    response = await async_client.patch(
+        "/books/{0}/{1}".format(added_book["title"], added_book["author"]),
+        json=invalid_payload,
+        headers={"Authorization": f"Bearer {created_token}"},
+    )
+    assert response.status_code == 400
+    assert "No data input provided" in response.json()["detail"]
+
+
+@pytest.mark.parametrize(
+    "invalid_payload, status_code, error_msg",
+    [
+        (
+            {"genres": ["invalid"]},
+            422,
+            "Invalid genre: check 'get genres' for list of accessible genres",
+        ),
+        ({"avg_rating": 6.7}, 422, "Input should be less than or equal to 5"),
+        ({"num_ratings": "ten"}, 422, "Input should be a valid integer"),
+        (
+            {"first_published": "22 October 2020"},
+            422,
+            "Input should be a valid date or datetime",
+        ),
+    ],
+)
+@pytest.mark.anyio
+async def test_update_book_422_incorrect_update_data(
+    async_client: AsyncClient,
+    added_book: dict,
+    created_token: str,
+    invalid_payload: dict,
+    status_code: int,
+    error_msg: str,
+):
+    response = await async_client.patch(
+        "/books/{0}/{1}".format(added_book["title"], added_book["author"]),
+        json=invalid_payload,
+        headers={"Authorization": f"Bearer {created_token}"},
+    )
+    assert response.status_code == status_code
+    assert error_msg in response.text
+
+
+@pytest.mark.anyio
+async def test_delete_book_204(
+    async_client: AsyncClient, created_token: str, added_book: dict
+):
+    # Checking if the book exists in db
+    book = (
+        TestingSessionLocal()
+        .query(Books)
+        .filter(
+            func.lower(Books.author) == added_book["author"].lower().casefold(),
+            func.lower(Books.title) == added_book["title"].lower().casefold(),
+        )
+        .first()
+    )
+    assert book is not None
+    logger.debug(
+        "Book to delete: '%s' (by %s)." % (added_book["title"], added_book["author"])
+    )
+
+    # Calling the endpoint
+    response = await async_client.delete(
+        "/books/{0}/{1}".format(added_book["title"], added_book["author"]),
+        headers={"Authorization": f"Bearer {created_token}"},
+    )
+    assert response.status_code == 204
+
+    # Checking if the book no longer exists in db
+    book = (
+        TestingSessionLocal()
+        .query(Books)
+        .filter(Books.title == added_book["title"])
+        .first()
+    )
+    assert book is None
+
+
+@pytest.mark.anyio
+async def test_delete_book_401_not_authenticated(
+    async_client: AsyncClient, added_book: dict
+):
+    response = await async_client.delete(
+        "/books/{0}/{1}".format(added_book["title"], added_book["author"]),
+    )
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json()["detail"]
+
+
+@pytest.mark.anyio
+async def test_delete_book_404_book_not_found(
+    async_client: AsyncClient, created_token: str
+):
+    response = await async_client.delete(
+        "/books/fake title/fake author",
+        headers={"Authorization": f"Bearer {created_token}"},
+    )
+    assert response.status_code == 404
+    assert "The record was not found in the database" in response.json()["detail"]
+
+
+@pytest.mark.anyio
+async def test_delete_book_204__by_the_admin_user(
+    async_client: AsyncClient, created_user_token: tuple, added_book: dict
+):
+    # Checking if the book exists in db
+    book = (
+        TestingSessionLocal()
+        .query(Books)
+        .filter(
+            func.lower(Books.author) == added_book["author"].lower().casefold(),
+            func.lower(Books.title) == added_book["title"].lower().casefold(),
+        )
+        .first()
+    )
+    assert book is not None
+    logger.debug(
+        "Book to delete: '%s' (by %s)." % (added_book["title"], added_book["author"])
+    )
+
+    # Creating a user who is not the book creator but is an admin user
+    admin_user, token = create_user_and_token(username="admin_user", role="admin")
+    assert admin_user.username != book.created_by
+
+    # Calling the endpoint
+    response = await async_client.delete(
+        "/books/{0}/{1}".format(added_book["title"], added_book["author"]),
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 204
+
+    # Checking if the book no longer exists in db
+    book = (
+        TestingSessionLocal()
+        .query(Books)
+        .filter(Books.title == added_book["title"])
+        .first()
+    )
+    assert book is None
+
+
+@pytest.mark.anyio
+async def test_delete_book_403_forbidden_if_not_admin_or_book_creator(
+    async_client: AsyncClient, added_book: dict
+):
+    some_user, token = create_user_and_token(username="some_user", role="user")
+    assert added_book["created_by"] != some_user.username
+
+    response = await async_client.delete(
+        "/books/{0}/{1}".format(added_book["title"], added_book["author"]),
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 403
+    assert (
+        "Only a user with the 'admin' role or the author of the database record "
+        "can change or delete the record from the database."
+        in response.json()["detail"]
+    )

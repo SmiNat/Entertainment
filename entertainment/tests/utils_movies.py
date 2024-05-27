@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 
 from entertainment.models import Movies
+from entertainment.routers.utils import convert_items_list_to_a_sorted_string
 from entertainment.tests.conftest import TestingSessionLocal
 
 logger = logging.getLogger(__name__)
@@ -53,7 +54,7 @@ def create_movie(
     if isinstance(premiere, str):
         premiere = datetime.strptime(premiere, "%Y-%m-%d").date()
     if isinstance(genres, list):
-        genres = ", ".join(genres)
+        genres = convert_items_list_to_a_sorted_string(genres)
 
     movie = Movies(
         title=title,

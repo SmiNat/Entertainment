@@ -108,9 +108,17 @@ def test_check_items_list(
         assert expected_result in exc_info.value.detail
 
 
-def test_convert_items_list_to_a_sorted_string():
-    example_list = ["item1", "new_item", "Item7", "item1"]
-    expected_result = "Item7, item1, new_item"
+@pytest.mark.parametrize(
+    "example_list, expected_result",
+    [
+        (["item1", "new_item", "Item7", "item1"], "Item7, item1, new_item"),
+        ([None, None, None], None),
+        (None, None),
+    ],
+)
+def test_convert_items_list_to_a_sorted_string(
+    example_list: list | None, expected_result: str | None
+):
     result = convert_items_list_to_a_sorted_string(example_list)
     assert expected_result == result
 

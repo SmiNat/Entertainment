@@ -1,6 +1,7 @@
 import logging
 
 from entertainment.models import Books
+from entertainment.routers.utils import convert_items_list_to_a_sorted_string
 from entertainment.tests.conftest import TestingSessionLocal
 
 logger = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ def create_book(
     created_by: str | None = "John_Doe",
 ):
     if isinstance(genres, list):
-        genres = ", ".join(genres)
+        genres = convert_items_list_to_a_sorted_string(genres)
 
     book = Books(
         title=title,

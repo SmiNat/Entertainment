@@ -74,7 +74,12 @@ def mock_authorisation(
         }
 
 
-def create_user_and_token(username: str, email: str, password: str, role: str = "user"):
+def create_user_and_token(
+    username: str,
+    email: str = "some@example.com",
+    password: str = "password",
+    role: str = "user",
+):
     user = create_db_user(username, email, password, role)
     token = create_access_token(user.username, user.id, user.role)
     return user, token
