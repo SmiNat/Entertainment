@@ -36,10 +36,10 @@ router = APIRouter(
 db_dependency = Annotated[Session, Depends(get_db)]
 user_dependency = Annotated[dict, Depends(get_current_user)]
 
-
-accessible_movie_genres = get_unique_row_data(
-    os.environ.get("DEV_DATABASE_PATH"), "movies", "genres"
-)
+if __name__ == "__main__":
+    accessible_movie_genres = get_unique_row_data(
+        os.environ.get("DEV_DATABASE_PATH"), "movies", "genres"
+    )
 
 
 class MovieRequest(BaseModel):

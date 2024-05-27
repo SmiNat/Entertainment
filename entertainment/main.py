@@ -9,6 +9,11 @@ from fastapi.exception_handlers import http_exception_handler  # noqa: F401
 
 from entertainment.database import create_db_tables, db_initial_data
 from entertainment.logging_config import configure_logging
+from entertainment.routers.auth import router as auth_router
+from entertainment.routers.books import router as books_router
+from entertainment.routers.games import router as games_router
+from entertainment.routers.movies import router as movies_router
+from entertainment.routers.users import router as users_router
 
 # Setting logger
 LOG_FULL_TRACEBACK = False
@@ -29,13 +34,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Entertainment API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CorrelationIdMiddleware)
-
-
-from entertainment.routers.auth import router as auth_router  # noqa: E402
-from entertainment.routers.books import router as books_router  # noqa: E402
-from entertainment.routers.games import router as games_router  # noqa: E402
-from entertainment.routers.movies import router as movies_router  # noqa: E402
-from entertainment.routers.users import router as users_router  # noqa: E402
 
 app.include_router(auth_router)
 app.include_router(books_router)
