@@ -1,4 +1,5 @@
 import logging
+from unittest.mock import patch
 
 import pytest
 from fastapi.encoders import jsonable_encoder
@@ -6,6 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy import func
 
 from entertainment.models import Movies
+from entertainment.routers.movies import fetch_accessible_movie_genres
 from entertainment.tests.conftest import TestingSessionLocal
 from entertainment.tests.utils_movies import (
     check_if_db_movies_table_is_not_empty,
@@ -17,6 +19,13 @@ from entertainment.tests.utils_users import create_user_and_token
 logger = logging.getLogger(__name__)
 
 # COMMAND = "pytest entertainment/tests/routers/test_movies.py -s --log-cli-level=DEBUG"
+
+
+def test_get_unique_row_data_with_fixture():
+    with patch("entertainment.routers.movies.get_unique_row_data") as mock_function:
+        mock_function.return_value = ["value1", "value2", "value3"]
+        result = fetch_accessible_movie_genres(TestingSessionLocal())
+        assert result == ["value1", "value2", "value3"]
 
 
 @pytest.mark.anyio
@@ -34,7 +43,6 @@ async def test_get_movies_genres_non_empty_db(async_client: AsyncClient):
     create_movie(title="Third Movie", genres="drama")
     expected_result = ["Comedy", "Drama", "Family", "Music"]
 
-    # Making the request to the endpoint
     response = await async_client.get("/movies/genres")
     assert response.status_code == 200
     assert expected_result == response.json()
@@ -54,7 +62,6 @@ async def test_get_all_movies_200_non_empty_db(async_client: AsyncClient):
         ],
     }
 
-    # Making the request to the endpoint
     response = await async_client.get("/movies/all")
     assert response.status_code == 200
     assert expected_result == response.json()
@@ -234,40 +241,39 @@ async def test_search_movies_pagination(async_client: AsyncClient):
 
 
 @pytest.mark.anyio
-async def test_add_movie_201(
-    async_client: AsyncClient, created_user_token: tuple, mock_get_movies_genres
-):
+async def test_add_movie_201(async_client: AsyncClient, created_user_token: tuple):
     # Veryfying if the db movies table is empty
     assert check_if_db_movies_table_is_not_empty() is False
 
     user, token = created_user_token
     payload = movie_payload()
 
-    # Calling the endpoint by the user with the payload data
-    response = await async_client.post(
-        "/movies/add",
-        json=payload,
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert response.status_code == 201
+    with patch("entertainment.routers.movies.get_unique_row_data") as mock_function:
+        mock_function.return_value = ["Action", "Adventure", "Comedy", "Romance", "War"]
 
-    # Veryfying if the db movies table is not empty
-    assert check_if_db_movies_table_is_not_empty() is True
+        # Calling the endpoint by the user with the payload data
+        response = await async_client.post(
+            "/movies/add",
+            json=payload,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 201
 
-    # Veryfying if the db record has correct value of created_by_by field
-    db_record = (
-        TestingSessionLocal()
-        .query(Movies)
-        .filter(Movies.title == payload["title"])
-        .first()
-    )
-    assert db_record.created_by == user["username"]
+        # Veryfying if the db movies table is not empty
+        assert check_if_db_movies_table_is_not_empty() is True
+
+        # Veryfying if the db record has correct value of created_by_by field
+        db_record = (
+            TestingSessionLocal()
+            .query(Movies)
+            .filter(Movies.title == payload["title"])
+            .first()
+        )
+        assert db_record.created_by == user["username"]
 
 
 @pytest.mark.anyio
-async def test_add_movie_401_if_not_authenticated(
-    async_client: AsyncClient, mock_get_movies_genres
-):
+async def test_add_movie_401_if_not_authenticated(async_client: AsyncClient):
     payload = movie_payload()
 
     response = await async_client.post("/movies/add", json=payload)
@@ -286,25 +292,28 @@ async def test_add_movie_401_if_not_authenticated(
 )
 async def test_add_movie_422_not_unique_movie(
     async_client: AsyncClient,
-    added_movie: dict,
+    added_movie: Movies,
     created_token: str,
     invalid_title: str,
     comment: str,
-    mock_get_movies_genres,
 ):
     """The user can only create a movie with unique title and premiere date."""
-    payload = movie_payload(title=invalid_title, premiere=added_movie["premiere"])
+    payload = movie_payload(
+        title=invalid_title, premiere=added_movie.premiere.strftime("%Y-%m-%d")
+    )
 
-    response = await async_client.post(
-        "/movies/add",
-        json=payload,
-        headers={"Authorization": f"Bearer {created_token}"},
-    )
-    assert response.status_code == 422
-    assert (
-        "Unique constraint failed. A movie with that title and that premiere date "
-        "already exists in the database." in response.json()["detail"]
-    )
+    with patch("entertainment.routers.movies.get_unique_row_data") as mock_function:
+        mock_function.return_value = ["Action", "Adventure", "Comedy", "Romance", "War"]
+        response = await async_client.post(
+            "/movies/add",
+            json=payload,
+            headers={"Authorization": f"Bearer {created_token}"},
+        )
+        assert response.status_code == 422
+        assert (
+            "Unique constraint failed. A movie with that title and that premiere date "
+            "already exists in the database." in response.json()["detail"]
+        )
 
 
 @pytest.mark.anyio
@@ -328,7 +337,6 @@ async def test_add_movie_422_not_unique_movie(
 async def test_add_movie_422_invalid_input_data(
     async_client: AsyncClient,
     created_token: str,
-    mock_get_movies_genres,
     invalid_payload: dict,
     error_msg: str,
 ):
@@ -354,15 +362,15 @@ async def test_add_movie_422_invalid_input_data(
 @pytest.mark.anyio
 async def test_update_movie_202(
     async_client: AsyncClient,
-    added_movie: dict,
+    added_movie: Movies,
     created_user_token: tuple,
     value: str,
     comment: str,
 ):
     movie = added_movie
-    assert movie["updated_by"] is None
-    assert movie["score"] == 7.6
-    assert movie["orig_title"] == "Deadpool"
+    assert movie.updated_by is None
+    assert movie.score == 7.6
+    assert movie.orig_title == "Deadpool"
 
     user, token = created_user_token
     title = value
@@ -380,7 +388,7 @@ async def test_update_movie_202(
 
 @pytest.mark.anyio
 async def test_update_movie_401_if_not_authenticated(
-    async_client: AsyncClient, added_movie: dict, mock_get_movies_genres
+    async_client: AsyncClient, added_movie: Movies
 ):
     payload = {"score": 9.9, "original title": "Pool of death"}
 
@@ -408,9 +416,7 @@ async def test_update_movie_404_movie_not_found(
 
 
 @pytest.mark.anyio
-async def test_update_movie_202_update_by_the_admin(
-    async_client: AsyncClient,
-):
+async def test_update_movie_202_update_by_the_admin(async_client: AsyncClient):
     """Test if user who is an admin but is not a movie record creator
     can update that movie."""
     # Creating movie record by John_Doe
@@ -431,14 +437,16 @@ async def test_update_movie_202_update_by_the_admin(
         "genres": ["comedy", "war", "Comedy", "action"],
     }
 
-    response = await async_client.patch(
-        "/movies/Test Movie/2011-11-11",
-        json=payload,
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-    assert response.status_code == 202
-    assert payload["title"] == response.json()["title"]
-    assert admin_user.username == response.json()["updated_by"]
+    with patch("entertainment.routers.movies.get_unique_row_data") as mock_function:
+        mock_function.return_value = ["Action", "Adventure", "Comedy", "Romance", "War"]
+        response = await async_client.patch(
+            "/movies/Test Movie/2011-11-11",
+            json=payload,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert response.status_code == 202
+        assert payload["title"] == response.json()["title"]
+        assert admin_user.username == response.json()["updated_by"]
 
 
 @pytest.mark.anyio
@@ -480,7 +488,7 @@ async def test_update_movie_403_update_by_the_user_who_is_not_the_movie_creator(
 )
 async def test_update_movie_422_not_unique_movie(
     async_client: AsyncClient,
-    added_movie: dict,
+    added_movie: Movies,
     created_token: str,
     title: str,
     comment: str,
@@ -516,20 +524,23 @@ async def test_update_movie_422_not_unique_movie(
 )
 async def test_update_movie_400_if_no_data_to_change(
     async_client: AsyncClient,
-    added_movie: dict,
+    added_movie: Movies,
     created_token: str,
     invalid_payload: dict,
     expected_error: str | None,
 ):
     payload = invalid_payload
 
-    response = await async_client.patch(
-        "/movies/{0}/{1}".format(added_movie["title"], added_movie["premiere"]),
-        json=payload,
-        headers={"Authorization": f"Bearer {created_token}"},
-    )
-    assert response.status_code == 400
-    assert expected_error in response.json()["detail"]
+    with patch("entertainment.routers.movies.get_unique_row_data") as mock_function:
+        mock_function.return_value = ["Action", "Adventure", "Comedy", "Romance", "War"]
+        response = await async_client.patch(
+            "/movies/{0}/{1}".format(added_movie.title, added_movie.premiere),
+            json=payload,
+            headers={"Authorization": f"Bearer {created_token}"},
+        )
+        logger.debug("Response: %s" % response.json())
+        assert response.status_code == 400
+        assert expected_error in response.json()["detail"]
 
 
 @pytest.mark.anyio
@@ -550,7 +561,7 @@ async def test_update_movie_400_if_no_data_to_change(
 )
 async def test_update_movie_422_incorrect_update_data(
     async_client: AsyncClient,
-    added_movie: dict,
+    added_movie: Movies,
     created_token: str,
     invalid_payload: dict,
     error_msg: str,
@@ -570,7 +581,7 @@ async def test_update_movie_422_incorrect_update_data(
 @pytest.mark.anyio
 async def test_delete_movie_204(
     async_client: AsyncClient,
-    added_movie: dict,
+    added_movie: Movies,
     created_token: str,
 ):
     # Checking if the movie exists in db
@@ -578,8 +589,8 @@ async def test_delete_movie_204(
         TestingSessionLocal()
         .query(Movies)
         .filter(
-            Movies.premiere == added_movie["premiere"],
-            func.lower(Movies.title) == added_movie["title"].lower().casefold(),
+            Movies.premiere == added_movie.premiere,
+            func.lower(Movies.title) == added_movie.title.lower().casefold(),
         )
         .first()
     )
@@ -588,7 +599,7 @@ async def test_delete_movie_204(
 
     # Calling the endpoint
     response = await async_client.delete(
-        "/movies/{0}/{1}".format(added_movie["title"], added_movie["premiere"]),
+        "/movies/{0}/{1}".format(added_movie.title, added_movie.premiere),
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 204
@@ -602,9 +613,7 @@ async def test_delete_movie_204(
 
 @pytest.mark.anyio
 async def test_delete_movie_401_if_not_authenticated(
-    async_client: AsyncClient,
-    added_movie: dict,
-    created_token: str,
+    async_client: AsyncClient, added_movie: Movies
 ):
     # Checking if the movie exists in db
     movie = (

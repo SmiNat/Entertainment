@@ -1,4 +1,5 @@
 import os
+import sqlite3
 from typing import Callable
 
 import pytest
@@ -22,8 +23,40 @@ from entertainment.tests.utils_movies import create_movie
 from entertainment.tests.utils_users import create_db_user
 
 
-def test_get_unique_row_data_with_path_argument(database_genres):
+def test_get_unique_row_data_with_path_argument():
     test_path = os.environ.get("DEV_DATABASE_PATH")
+
+    # Creating database initial data
+    conn = sqlite3.connect(test_path)
+
+    # Drop the table if it exists
+    drop_table = """DROP TABLE IF EXISTS test_table;"""
+    conn.execute(drop_table)
+
+    # Create a new table
+    test_table = """
+    CREATE TABLE test_table (
+    id      INTEGER     PRIMARY KEY,
+    title   VARCHAR,
+    genres  TEXT
+    );
+    """
+    conn.execute(test_table)
+
+    # Fill the table with content
+    content = """
+    INSERT INTO test_table (title, genres)
+    VALUES
+        ("First test", "Classics, Drama, Fiction"),
+        ("A new test", "Classics, Magic, Mythology"),
+        ("Another test", "Classics, Fantasy, Fiction");
+    """
+    conn.execute(content)
+
+    conn.commit()
+    conn.close()
+
+    # Testing function get_unique_row_data
     table_name = "test_table"
     expected_result = [
         "Classics",
@@ -151,7 +184,10 @@ def test_check_items_list(
 @pytest.mark.parametrize(
     "example_list, expected_result",
     [
-        (["item1", "new_item", "Item7", "item1"], "Item7, item1, new_item"),
+        (
+            ["item1", "new_item", "Item7", "item1", "new item"],
+            "Item1, Item7, New Item, New_Item",
+        ),
         ([None, None, None], None),
         (None, None),
     ],

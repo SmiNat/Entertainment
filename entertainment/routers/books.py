@@ -1,10 +1,9 @@
 import datetime
 import logging
-import os
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 from sqlalchemy import extract, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -29,10 +28,9 @@ router = APIRouter(prefix="/books", tags=["books"])
 db_dependency = Annotated[Session, Depends(get_db)]
 user_dependency = Annotated[dict, Depends(get_current_user)]
 
-if __name__ == "__main__":
-    accessible_book_genres = get_unique_row_data(
-        os.environ.get("DEV_DATABASE_PATH"), "books", "genres"
-    )
+
+def fetch_accessible_book_genres(db: Session = Depends(get_db)) -> list[str]:
+    return get_unique_row_data(db, "books", "genres")
 
 
 class BookRequest(BaseModel):
@@ -56,14 +54,9 @@ class BookRequest(BaseModel):
     class DictConfig:
         from_attributes = True
 
-    @field_validator("genres")
-    @classmethod
-    def genres_are_valid_and_converted_to_a_string(cls, genres: list):
-        return (
-            check_items_list(genres, accessible_book_genres)
-            if isinstance(genres, list)
-            else genres
-        )
+
+def get_accessible_book_genres(db: Session = Depends(get_db)):
+    return get_unique_row_data(db, "books", "genres")
 
 
 class BookResponse(BookRequest):
@@ -168,8 +161,16 @@ async def search_books(
 
 
 @router.post("/add", status_code=201, response_model=BookResponse)
-async def add_book(user: user_dependency, db: db_dependency, new_book: BookRequest):
+async def add_book(
+    user: user_dependency,
+    db: db_dependency,
+    new_book: BookRequest,
+    accessible_book_genres: list[str] = Depends(fetch_accessible_book_genres),
+):
     book = Books(**new_book.model_dump(), created_by=user["username"])
+
+    # Validate genres and convert a list to a string
+    check_items_list(new_book.genres, accessible_book_genres)
     genres = convert_items_list_to_a_sorted_string(new_book.genres)
     book.genres = genres
 
@@ -196,6 +197,7 @@ async def update_book(
     db: db_dependency,
     user: user_dependency,
     book_update: UpdateBookRequest,
+    accessible_book_genres: list[str] = Depends(fetch_accessible_book_genres),
 ):
     logger.debug("Book to update: '%s' (%s)." % (title, author))
 
@@ -216,6 +218,10 @@ async def update_book(
     check_if_author_or_admin(user, book)
 
     fields_to_update = book_update.model_dump(exclude_none=True, exclude_unset=True)
+    if "genres" in fields_to_update.keys() and all(
+        genre is None for genre in fields_to_update["genres"]
+    ):
+        del fields_to_update["genres"]
     if not fields_to_update:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail="No data input provided."
@@ -225,6 +231,7 @@ async def update_book(
     for field, value in fields_to_update.items():
         logger.debug("Updating: field: %s, value: %s" % (field, value))
         if field == "genres":
+            check_items_list(value, accessible_book_genres)
             setattr(book, field, convert_items_list_to_a_sorted_string(value))
         else:
             setattr(book, field, value)

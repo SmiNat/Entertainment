@@ -16,6 +16,8 @@ def get_unique_row_data(
     """Extracts all unique values from a given database table, returns the list of unique column values.
     If values are stored in rows as a a string separated with commas instead of a list of strings,
     converts values as a string into a list before returning unique values."""
+    all_rows_data = []  # Initialize all_rows_data with an empty list
+
     if isinstance(db_path_or_session, str):
         # Connect to the SQLite database
         conn = sqlite3.connect(db_path_or_session)
@@ -107,8 +109,8 @@ def convert_items_list_to_a_sorted_string(items: list[str]) -> str | None:
     """Converts a list of items into a string of unique sorted items."""
     if not items:
         return None
-    items = list(set(items))
-    if items == [None]:
+    items = list(set(item.strip().title() for item in items if item))
+    if items == [None] or items == []:
         return None
     items.sort()
     items_string = ", ".join(items)
