@@ -1,6 +1,5 @@
 import datetime
 import logging
-import os
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
@@ -23,7 +22,7 @@ from entertainment.routers.utils import (
     check_language,
     convert_items_list_to_a_sorted_string,
     convert_list_to_unique_values,
-    get_unique_genres,
+    get_unique_row_data,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,9 +36,8 @@ db_dependency = Annotated[Session, Depends(get_db)]
 user_dependency = Annotated[dict, Depends(get_current_user)]
 
 
-accessible_movie_genres = get_unique_genres(
-    os.environ.get("DEV_DATABASE_PATH"), "movies"
-)
+def fetch_accessible_movie_genres(db: Session = Depends(get_db)) -> list[str]:
+    return get_unique_row_data(db, "movies", "genres")
 
 
 class MovieRequest(BaseModel):
@@ -71,15 +69,6 @@ class MovieRequest(BaseModel):
     @classmethod
     def country_is_in_pycountry_library(cls, country: str):
         return check_country(country)
-
-    @field_validator("genres")
-    @classmethod
-    def genres_are_valid_and_converted_to_a_string(cls, genres: list):
-        return (
-            check_items_list(genres, accessible_movie_genres)
-            if isinstance(genres, list)
-            else genres
-        )
 
 
 class MovieResponse(MovieRequest):
@@ -216,9 +205,15 @@ async def search_movies(
 
 @router.post("/add", status_code=status.HTTP_201_CREATED)
 async def add_movie(
-    db: db_dependency, user: user_dependency, movie_request: MovieRequest
+    db: db_dependency,
+    user: user_dependency,
+    movie_request: MovieRequest,
+    accessible_movie_genres: list[str] = Depends(fetch_accessible_movie_genres),
 ):
     movie = Movies(**movie_request.model_dump(), created_by=user.get("username"))
+
+    # Validate genres and convert a list to a string
+    check_items_list(movie_request.genres, accessible_movie_genres)
     genres = convert_items_list_to_a_sorted_string(movie_request.genres)
     movie.genres = genres
 
@@ -246,6 +241,7 @@ async def update_movie(
     movie_update: UpdateMovieRequest,
     title: str,
     premiere: datetime.date = Path(description="Use YYYY-MM-DD, eg. 2024-07-12."),
+    accessible_movie_genres: list[str] = Depends(fetch_accessible_movie_genres),
 ):
     """Update movie - endpoint available for user who created a movie record or for an admin user."""
 
@@ -268,6 +264,10 @@ async def update_movie(
     check_if_author_or_admin(user, movie)
 
     fields_to_update = movie_update.model_dump(exclude_unset=True, exclude_none=True)
+    if "genres" in fields_to_update.keys() and all(
+        genre is None for genre in fields_to_update["genres"]
+    ):
+        del fields_to_update["genres"]
     if not fields_to_update:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail="No data input provided."
@@ -278,6 +278,7 @@ async def update_movie(
         for field, value in fields_to_update.items():
             logger.debug("Updating: field: %s, value: %s" % (field, value))
             if field == "genres":
+                check_items_list(value, accessible_movie_genres)
                 setattr(movie, field, convert_items_list_to_a_sorted_string(value))
             else:
                 setattr(movie, field, value)

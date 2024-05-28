@@ -4,39 +4,52 @@ from typing import Callable
 
 import pycountry
 from fastapi import HTTPException, status
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from entertainment.models import Books, Games, Movies, Songs, Users
 
 
-def get_unique_genres(db_path, table_name: str):
-    """Extracts all genres from a given database table, returns the list of unique genres.
-    If genres are stored in rows as a one string separated with commas instead of a list of strings,
-    converts genres as a string into a list before returning unique values."""
-    # Connect to the SQLite database
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+def get_unique_row_data(
+    db_path_or_session: str | Session, table_name: str, column_name: str
+):
+    """Extracts all unique values from a given database table, returns the list of unique column values.
+    If values are stored in rows as a a string separated with commas instead of a list of strings,
+    converts values as a string into a list before returning unique values."""
+    all_rows_data = []  # Initialize all_rows_data with an empty list
 
-    # Execute the query to get all genres
-    cursor.execute(f"SELECT genres FROM {table_name}")
+    if isinstance(db_path_or_session, str):
+        # Connect to the SQLite database
+        conn = sqlite3.connect(db_path_or_session)
+        cursor = conn.cursor()
 
-    # Fetch all results
-    genres_data = cursor.fetchall()
+        # Execute the query to get all row values
+        cursor.execute(f"SELECT DISTINCT {column_name} FROM {table_name}")
 
-    # Close the connection
-    conn.close()
+        # Fetch all results
+        all_rows_data = cursor.fetchall()
 
-    # Process the fetched genres to get unique values
-    all_genres = set()
-    for row in genres_data:
+        # Close the connection
+        conn.close()
+
+    elif isinstance(db_path_or_session, Session):
+        # Use the SQLAlchemy session to execute the query
+        query = text(f"SELECT DISTINCT {column_name} FROM {table_name}")
+        result = db_path_or_session.execute(query)
+        all_rows_data = result.fetchall()
+
+    # Process the fetched values to get unique values
+    all_values = set()
+    for row in all_rows_data:
         if isinstance(row[0], list):
-            all_genres.update(row[0])
+            all_values.update(row[0])
         elif isinstance(row[0], str):
-            genres = row[0].split(", ")
-            all_genres.update(genres)
+            values = row[0].split(", ")
+            all_values.update(values)
 
-    # Extract unique values from each genre string in genres list
-    genres = convert_list_to_unique_values(list(all_genres))
-    return genres
+    # Extract unique values from each value string in values list
+    values = convert_list_to_unique_values(list(all_values))
+    return values
 
 
 def check_if_author_or_admin(
@@ -96,8 +109,8 @@ def convert_items_list_to_a_sorted_string(items: list[str]) -> str | None:
     """Converts a list of items into a string of unique sorted items."""
     if not items:
         return None
-    items = list(set(items))
-    if items == [None]:
+    items = list(set(item.strip().title() for item in items if item))
+    if items == [None] or items == []:
         return None
     items.sort()
     items_string = ", ".join(items)

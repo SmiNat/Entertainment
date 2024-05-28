@@ -128,7 +128,7 @@ class Games(Base):
     review_overall = Column(StrippedString)
     review_detailed = Column(StrippedString)
     reviews_number = Column(Integer)
-    reviews_positive = Column(StrippedString)
+    reviews_positive = Column(Float)
     created_by = Column(StrippedString)
     updated_by = Column(StrippedString)
 

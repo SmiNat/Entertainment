@@ -11,6 +11,7 @@ from entertainment.database import create_db_tables, db_initial_data
 from entertainment.logging_config import configure_logging
 from entertainment.routers.auth import router as auth_router
 from entertainment.routers.books import router as books_router
+from entertainment.routers.games import router as games_router
 from entertainment.routers.movies import router as movies_router
 from entertainment.routers.users import router as users_router
 
@@ -38,6 +39,7 @@ app.include_router(auth_router)
 app.include_router(books_router)
 app.include_router(movies_router)
 app.include_router(users_router)
+app.include_router(games_router)
 
 
 # Logging the HTTPExceptions

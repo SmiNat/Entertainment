@@ -1,8 +1,10 @@
 import os
+import sqlite3
 from typing import Callable
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import text
 
 from entertainment.routers.utils import (
     check_country,
@@ -13,15 +15,48 @@ from entertainment.routers.utils import (
     check_language,
     convert_items_list_to_a_sorted_string,
     convert_list_to_unique_values,
-    get_unique_genres,
+    get_unique_row_data,
     validate_field,
 )
+from entertainment.tests.conftest import TestingSessionLocal
 from entertainment.tests.utils_movies import create_movie
 from entertainment.tests.utils_users import create_db_user
 
 
-def test_get_unique_genres(database_genres):
+def test_get_unique_row_data_with_path_argument():
     test_path = os.environ.get("DEV_DATABASE_PATH")
+
+    # Creating database initial data
+    conn = sqlite3.connect(test_path)
+
+    # Drop the table if it exists
+    drop_table = """DROP TABLE IF EXISTS test_table;"""
+    conn.execute(drop_table)
+
+    # Create a new table
+    test_table = """
+    CREATE TABLE test_table (
+    id      INTEGER     PRIMARY KEY,
+    title   VARCHAR,
+    genres  TEXT
+    );
+    """
+    conn.execute(test_table)
+
+    # Fill the table with content
+    content = """
+    INSERT INTO test_table (title, genres)
+    VALUES
+        ("First test", "Classics, Drama, Fiction"),
+        ("A new test", "Classics, Magic, Mythology"),
+        ("Another test", "Classics, Fantasy, Fiction");
+    """
+    conn.execute(content)
+
+    conn.commit()
+    conn.close()
+
+    # Testing function get_unique_row_data
     table_name = "test_table"
     expected_result = [
         "Classics",
@@ -31,7 +66,45 @@ def test_get_unique_genres(database_genres):
         "Magic",
         "Mythology",
     ]
-    assert expected_result == get_unique_genres(test_path, table_name)
+    assert expected_result == get_unique_row_data(test_path, table_name, "genres")
+
+
+def test_get_unique_row_data_with_session_argument():
+    # Creatina a 'test_table' with 'title' and 'genres' columns
+    new_table = """
+    CREATE TABLE test_table (
+    id      INTEGER     PRIMARY KEY,
+    title   VARCHAR,
+    genres  TEXT
+    );
+    """
+    new_content = """
+    INSERT INTO test_table (title, genres)
+    VALUES
+        ("First test", "Classics, Drama, Fiction"),
+        ("A new test", "Classics, Magic, Mythology"),
+        ("Another test", "Classics, Fantasy, Fiction");
+    """
+
+    # Using the same session for creating the table, inserting data, and testing
+    with TestingSessionLocal() as session:
+        # Creating table and inserting data
+        session.execute(text(new_table))
+        session.execute(text(new_content))
+        session.commit()
+
+        # Testing if get_unique_row_data will return expected result
+        table_name = "test_table"
+        expected_result = [
+            "Classics",
+            "Drama",
+            "Fantasy",
+            "Fiction",
+            "Magic",
+            "Mythology",
+        ]
+        result = get_unique_row_data(session, table_name, "genres")
+        assert sorted(expected_result) == sorted(result)
 
 
 @pytest.mark.parametrize(
@@ -111,7 +184,10 @@ def test_check_items_list(
 @pytest.mark.parametrize(
     "example_list, expected_result",
     [
-        (["item1", "new_item", "Item7", "item1"], "Item7, item1, new_item"),
+        (
+            ["item1", "new_item", "Item7", "item1", "new item"],
+            "Item1, Item7, New Item, New_Item",
+        ),
         ([None, None, None], None),
         (None, None),
     ],

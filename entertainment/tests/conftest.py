@@ -1,11 +1,9 @@
+import datetime
 import logging
 import os
-import sqlite3
 from typing import AsyncGenerator, Generator
-from unittest.mock import patch
 
 import pytest
-from fastapi.encoders import jsonable_encoder
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine, text
@@ -15,7 +13,6 @@ os.environ["ENV_STATE"] = "test"
 
 from entertainment.config import config  # noqa: E402
 from entertainment.database import Base, get_db  # noqa: E402
-from entertainment.enums import MovieGenres  # noqa: E402
 from entertainment.main import app  # noqa: E402
 from entertainment.models import Books, Movies, Users  # noqa: E402
 from entertainment.routers.auth import create_access_token  # noqa: E402
@@ -53,12 +50,12 @@ app.dependency_overrides[get_db] = override_get_db
 @pytest.fixture(autouse=True, scope="function")
 def clean_db():
     """Cleans db session for each test."""
-    db = TestingSessionLocal()
-    db.execute(text("DELETE FROM users"))
-    db.execute(text("DELETE FROM movies"))
-    db.execute(text("DELETE FROM books"))
-    db.commit()
-    db.close()
+    with TestingSessionLocal() as db:
+        db.execute(text("DELETE FROM users"))
+        db.execute(text("DELETE FROM movies"))
+        db.execute(text("DELETE FROM books"))
+        db.execute(text("DROP TABLE IF EXISTS test_table;"))
+        db.commit()
 
 
 # Overriding fixture pytest.mark.anyio to test async functions
@@ -92,39 +89,6 @@ async def async_client(client) -> AsyncGenerator:
 
 
 @pytest.fixture
-def database_genres():
-    test_path = os.environ.get("DEV_DATABASE_PATH")
-    conn = sqlite3.connect(test_path)
-
-    # Drop the table if it exists
-    drop_table = """DROP TABLE IF EXISTS test_table;"""
-    conn.execute(drop_table)
-
-    # Create a new table
-    test_table = """
-    CREATE TABLE test_table (
-    id      INTEGER     PRIMARY KEY,
-    title   VARCHAR,
-    genres  TEXT
-    );
-    """
-    conn.execute(test_table)
-
-    # Fill the table with content
-    books_content = """
-    INSERT INTO test_table (title, genres)
-    VALUES
-        ("First test", "Classics, Drama, Fiction"),
-        ("A new test", "Classics, Magic, Mythology"),
-        ("Another test", "Classics, Fantasy, Fiction");
-    """
-    conn.execute(books_content)
-
-    conn.commit()
-    conn.close()
-
-
-@pytest.fixture
 def created_admin_user() -> Users:
     db = TestingSessionLocal()
     try:
@@ -150,8 +114,6 @@ async def registered_user(async_client: AsyncClient) -> dict:
     payload = {
         "username": "testuser",
         "email": "test@example.com",
-        # "first_name": None,
-        # "last_name": None,
         "password": "testpass123",
         "confirm_password": "testpass123",
     }
@@ -176,77 +138,53 @@ async def created_user_token(registered_user, created_token) -> tuple:
     return user, token
 
 
-@pytest.fixture
-def mock_get_movies_genres():
-    with patch(
-        "entertainment.routers.movies.get_movies_genres"
-    ) as mock_get_movies_genres:
-        mock_get_movies_genres.return_value = list(
-            map(lambda genre: genre.value, MovieGenres)
-        )
-        yield mock_get_movies_genres
-
-
 @pytest.fixture()
-async def added_movie(
-    async_client: AsyncClient, created_token: str, mock_get_movies_genres
-) -> dict:
+async def added_movie() -> Movies:
     """Creates movie record in the database before running a test."""
-    payload = {
-        "title": "Deadpool",
-        "premiere": "2016-02-11",
-        "score": 7.6,
-        "genres": ["comedy", "Adventure", "Action"],
-        "overview": "The origin story of former Special Forces operative ....",
-        "crew": "Ryan Reynolds, Wade Wilson / Deadpool, ...",
-        "orig_title": "Deadpool",
-        "orig_lang": "English",
-        "budget": 58000000,
-        "revenue": 781947691,
-        "country": "AU",
-    }
-    await async_client.post(
-        "/movies/add",
-        json=payload,
-        headers={"Authorization": f"Bearer {created_token}"},
+    movie = Movies(
+        title="Deadpool",
+        premiere=datetime.date(2016, 2, 11),
+        score=7.6,
+        genres="Action, Adventure, Comedy",
+        overview="The origin story of former Special Forces operative ....",
+        crew="Ryan Reynolds, Wade Wilson / Deadpool, ...",
+        orig_title="Deadpool",
+        orig_lang="English",
+        budget=58000000,
+        revenue=781947691,
+        country="AU",
+        created_by="testuser",
     )
-    movie = (
-        TestingSessionLocal().query(Movies).filter(Movies.title == "Deadpool").first()
-    )
-    return jsonable_encoder(movie)
 
-
-@pytest.fixture
-def mock_get_books_genres():
-    with patch("entertainment.routers.books.get_books_genres") as mock_get_books_genres:
-        mock_get_books_genres.return_value = [
-            "Classics",
-            "Fantasy",
-            "Fiction",
-            "Magic",
-            "Psychology",
-        ]
-        yield mock_get_movies_genres
+    db = TestingSessionLocal()
+    try:
+        db.add(movie)
+        db.commit()
+        db.refresh(movie)
+        return movie
+    finally:
+        db.close()
 
 
 @pytest.fixture()
-async def added_book(
-    async_client: AsyncClient, created_token: str, mock_get_books_genres
-) -> dict:
+async def added_book() -> Books:
     """Creates book record in the database before running a test."""
-    payload = {
-        "title": "New book",
-        "author": "John Doe",
-        "description": None,
-        "genres": ["classics", "romance"],
-        "avg_rating": 3.2,
-        "num_ratings": 1000,
-        "first_published": "2011-11-11",
-    }
-    await async_client.post(
-        "/books/add",
-        json=payload,
-        headers={"Authorization": f"Bearer {created_token}"},
+    book = Books(
+        title="New book",
+        author="John Doe",
+        description=None,
+        genres="Classics, Romance",
+        avg_rating=3.2,
+        num_ratings=1000,
+        first_published=datetime.date(2011, 11, 11),
+        created_by="testuser",
     )
-    book = TestingSessionLocal().query(Books).filter(Books.title == "New book").first()
-    return jsonable_encoder(book)
+
+    db = TestingSessionLocal()
+    try:
+        db.add(book)
+        db.commit()
+        db.refresh(book)
+        return book
+    finally:
+        db.close()
