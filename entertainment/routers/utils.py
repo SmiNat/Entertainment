@@ -10,6 +10,10 @@ from sqlalchemy.orm import Session
 from entertainment.models import Books, Games, Movies, Songs, Users
 
 
+def smart_title(text: str):
+    return " ".join(i if i.isupper() else i.capitalize() for i in text.split())
+
+
 def get_unique_row_data(
     db_path_or_session: str | Session, table_name: str, column_name: str
 ):
@@ -109,7 +113,7 @@ def convert_items_list_to_a_sorted_string(items: list[str]) -> str | None:
     """Converts a list of items into a string of unique sorted items."""
     if not items:
         return None
-    items = list(set(item.strip().title() for item in items if item))
+    items = list(set(smart_title(item.strip()) for item in items if item))
     if items == [None] or items == []:
         return None
     items.sort()
@@ -188,16 +192,16 @@ def convert_list_to_unique_values(
     a unique list sorted by value.
     """
     if not nested_values_inside_strings:
-        return sorted(set(value.title() for value in values_to_check))
+        return sorted(set(smart_title(value) for value in values_to_check))
 
     unique_values = set()
     for value in values_to_check:
         if value:
             if "," not in value:
-                unique_values.add(value.title())
+                unique_values.add(smart_title(value))
             else:
                 values_list = value.split(sep)
                 for element in values_list:
                     element = str(element).strip()
-                    unique_values.add(element.title())
+                    unique_values.add(smart_title(element))
     return sorted(unique_values)
