@@ -1,5 +1,6 @@
 import datetime
 import logging
+from math import ceil
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
@@ -129,19 +130,23 @@ async def get_all_movies(
     page_size: int = Query(10, ge=1, le=100),
     page_number: int = Query(default=1, gt=0),
 ) -> dict[str, list[Row[_TP]]]:
-    movie_model = db.query(Movies).all()
+    movies = db.query(Movies).all()
 
-    if not movie_model:
+    if not movies:
         raise RecordNotFoundException(detail="Movies not found.")
 
-    logger.debug("Database hits (all movies): %s records." % len(movie_model))
+    logger.debug("Database hits (all movies): %s records." % len(movies))
 
     start_index = (page_number - 1) * page_size
     end_index = start_index + page_size
 
+    if not movies[start_index:end_index]:
+        raise HTTPException(404, "Movies not found.")
+
     return {
-        "number of movies": len(movie_model),
-        "movies": movie_model[start_index:end_index],
+        "number of movies": len(movies),
+        "page": f"{page_number} of {ceil(len(movies)/page_size)}",
+        "movies": movies[start_index:end_index],
     }
 
 
@@ -200,7 +205,14 @@ async def search_movies(
     logger.debug("Database hits (search movies): %s." % len(query.all()))
 
     results = query.offset((page - 1) * 10).limit(10).all()
-    return {"number of movies": len(query.all()), "movies": results}
+    if not results:
+        raise HTTPException(404, "Movies not found.")
+
+    return {
+        "number of movies": len(query.all()),
+        "page": f"{page} of {ceil(len(query.all())/10)}",
+        "movies": results,
+    }
 
 
 @router.post("/add", status_code=status.HTTP_201_CREATED)
