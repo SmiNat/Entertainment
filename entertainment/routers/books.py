@@ -1,5 +1,6 @@
 import datetime
 import logging
+from math import ceil
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -77,6 +78,12 @@ class UpdateBookRequest(BookRequest):
     )
 
 
+class ResponseModel(BaseModel):
+    number_of_books: int
+    page: str
+    books: list[BookResponse]
+
+
 @router.get("/genres", status_code=200, description="Get all available book genres.")
 async def get_books_genres(db: db_dependency) -> list:
     query = select(Books.genres).distinct()
@@ -89,8 +96,7 @@ async def get_books_genres(db: db_dependency) -> list:
 @router.get(
     "/all",
     status_code=200,
-    response_model=list[BookResponse],
-    # response_model=None,
+    response_model=ResponseModel,
     response_model_exclude_none=True,
 )
 async def get_all_books(
@@ -99,22 +105,24 @@ async def get_all_books(
         default=10, gt=0, le=100, description="Number of records per page."
     ),
     page_number: int = Query(1, gt=0),
-) -> list[Books]:
-    books = db.query(Books).all()
-    if not books:
+) -> dict:
+    books = db.query(Books)
+    results = books.offset((page_number - 1) * page_size).limit(page_size).all()
+    if not results:
         raise HTTPException(404, "Books not found.")
 
-    start_index = (page_number - 1) * page_size
-    end_index = start_index + page_size
-
-    logger.debug("Database hits (all books): %s records." % len(books))
-    return books[start_index:end_index]
+    return {
+        "number_of_books": len(books.all()),
+        "page": f"{page_number} of {ceil(len(books.all())/page_size)}",
+        "books": results,
+    }
 
 
 @router.get(
     "/search",
     status_code=200,
-    response_model=None,
+    response_model=ResponseModel,
+    response_model_exclude_none=True,
 )
 async def search_books(
     db: db_dependency,
@@ -157,7 +165,14 @@ async def search_books(
     logger.debug("Database hits (search books): %s." % len(query.all()))
 
     results = query.offset((page - 1) * 10).limit(10).all()
-    return {"number of books": len(query.all()), "books": results}
+    if not results:
+        raise HTTPException(404, "Books not found.")
+
+    return {
+        "number_of_books": len(query.all()),
+        "page": f"{page} of {ceil(len(query.all())/10)}",
+        "books": results,
+    }
 
 
 @router.post("/add", status_code=201, response_model=BookResponse)

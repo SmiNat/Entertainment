@@ -55,6 +55,7 @@ async def test_get_all_movies_200_non_empty_db(async_client: AsyncClient):
     movie3 = create_movie(score=2.7, premiere="2023-03-02", genres="drama")
     expected_result = {
         "number of movies": 3,
+        "page": "1 of 1",
         "movies": [
             jsonable_encoder(movie1),
             jsonable_encoder(movie2),
@@ -82,18 +83,16 @@ async def test_get_all_movies_pagination(async_client: AsyncClient):
 
     # Making the request to the endpoint with page size and page number - empty page
     params = {"page_size": 10, "page_number": 2}
-    expected_result = {
-        "number of movies": 3,
-        "movies": [],
-    }
+    expected_result = "Movies not found."
     response = await async_client.get("/movies/all", params=params)
-    assert response.status_code == 200
-    assert expected_result == response.json()
+    assert response.status_code == 404
+    assert expected_result == response.json()["detail"]
 
     # Making the request to the endpoint with page size and page number - page with movies
     params = {"page_size": 1, "page_number": 3}
     expected_result = {
         "number of movies": 3,
+        "page": "3 of 3",
         "movies": [
             {
                 "id": 3,
@@ -127,12 +126,9 @@ async def test_get_all_movies_pagination(async_client: AsyncClient):
 @pytest.mark.anyio
 async def test_search_movies_empty_db(async_client: AsyncClient):
     response = await async_client.get("/movies/search")
-    expected_result = {
-        "number of movies": 0,
-        "movies": [],
-    }
-    assert response.status_code == 200
-    assert expected_result == response.json()
+    expected_result = "Movies not found."
+    assert response.status_code == 404
+    assert expected_result == response.json()["detail"]
 
 
 @pytest.mark.anyio
@@ -147,6 +143,7 @@ async def test_search_movies_non_empty_db(async_client: AsyncClient):
     )
     expected_result = {
         "number of movies": 1,
+        "page": "1 of 1",
         "movies": [jsonable_encoder(movie1)],
     }
     assert response.status_code == 200
@@ -156,6 +153,7 @@ async def test_search_movies_non_empty_db(async_client: AsyncClient):
     response = await async_client.get("/movies/search", params={"score_ge": 9.0})
     expected_result = {
         "number of movies": 2,
+        "page": "1 of 1",
         "movies": [jsonable_encoder(movie1), jsonable_encoder(movie2)],
     }
     assert response.status_code == 200
@@ -165,6 +163,7 @@ async def test_search_movies_non_empty_db(async_client: AsyncClient):
     response = await async_client.get("/movies/search", params={"title": "movie"})
     expected_result = {
         "number of movies": 3,
+        "page": "1 of 1",
         "movies": [
             jsonable_encoder(movie1),
             jsonable_encoder(movie2),
@@ -180,6 +179,7 @@ async def test_search_movies_non_empty_db(async_client: AsyncClient):
     )
     expected_result = {
         "number of movies": 2,
+        "page": "1 of 1",
         "movies": [
             jsonable_encoder(movie1),
             jsonable_encoder(movie2),
@@ -195,6 +195,7 @@ async def test_search_movies_non_empty_db(async_client: AsyncClient):
     )
     expected_result = {
         "number of movies": 1,
+        "page": "1 of 1",
         "movies": [jsonable_encoder(movie1)],
     }
     assert response.status_code == 200
@@ -202,12 +203,9 @@ async def test_search_movies_non_empty_db(async_client: AsyncClient):
 
     # country == "PL"
     response = await async_client.get("/movies/search", params={"country": "PL"})
-    expected_result = {
-        "number of movies": 0,
-        "movies": [],
-    }
-    assert response.status_code == 200
-    assert expected_result == response.json()
+    expected_result = "Movies not found."
+    assert response.status_code == 404
+    assert expected_result == response.json()["detail"]
 
 
 @pytest.mark.anyio
@@ -220,6 +218,7 @@ async def test_search_movies_pagination(async_client: AsyncClient):
     # Calling the endpoint for the second page with all movies
     expected_result = {
         "number of movies": 11,
+        "page": "2 of 2",
         "movies": [jsonable_encoder(movies[-1])],
     }
     response = await async_client.get(
@@ -229,15 +228,12 @@ async def test_search_movies_pagination(async_client: AsyncClient):
     assert expected_result == response.json()
 
     # Calling the endpoint for the second page with movie title '3 movie'
-    expected_result = {
-        "number of movies": 1,
-        "movies": [],
-    }
+    expected_result = "Movies not found."
     response = await async_client.get(
         "/movies/search", params={"title": "3 movie", "page": 2}
     )
-    assert response.status_code == 200
-    assert expected_result == response.json()
+    assert response.status_code == 404
+    assert expected_result == response.json()["detail"]
 
 
 @pytest.mark.anyio

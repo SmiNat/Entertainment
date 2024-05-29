@@ -137,8 +137,11 @@ def check_country(country: str) -> str | None:
     except LookupError:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Invalid country name. Available country names: %s"
-            % [{country.alpha_2: country.name} for country in pycountry.countries],
+            detail="Invalid country name: '%s'. Available country names: %s"
+            % (
+                country,
+                [{country.alpha_2: country.name} for country in pycountry.countries],
+            ),
         )
 
 
@@ -152,8 +155,8 @@ def check_language(language: str) -> str | None:
     except LookupError:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Invalid language name. Available languages: %s"
-            % [language.name for language in pycountry.languages],
+            detail="Invalid language name: '%s'. Available languages: %s"
+            % (language, [language.name for language in pycountry.languages]),
         )
 
 

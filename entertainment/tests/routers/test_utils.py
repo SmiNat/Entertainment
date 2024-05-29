@@ -243,7 +243,10 @@ def test_check_country_with_invalid_data():
     with pytest.raises(HTTPException) as exc_info:
         check_country("invalid_country")
     assert exc_info.value.status_code == 422
-    assert "Invalid country name. Available country names:" in exc_info.value.detail
+    assert (
+        "Invalid country name: 'invalid_country'. Available country names:"
+        in exc_info.value.detail
+    )
 
 
 def test_check_country_with_empty_data():
@@ -263,7 +266,10 @@ def test_check_language_with_invalid_data():
     with pytest.raises(HTTPException) as exc_info:
         check_language("polnish")
     assert exc_info.value.status_code == 422
-    assert "Invalid language name. Available languages:" in exc_info.value.detail
+    assert (
+        "Invalid language name: 'polnish'. Available languages:"
+        in exc_info.value.detail
+    )
 
 
 def test_check_language_with_empty_data():
@@ -308,7 +314,7 @@ def test_check_language_with_empty_data():
             "orig_lang",
             {"orig_lang": "invalid", "score": 6.6},
             check_language,
-            "Invalid language name. Available languages",
+            "Invalid language name: 'invalid'. Available languages",
         ),
         (
             "country",
@@ -320,7 +326,7 @@ def test_check_language_with_empty_data():
             "country",
             {"country": "invalid", "score": 6.6},
             check_country,
-            "Invalid country name. Available country names",
+            "Invalid country name: 'invalid'. Available country names",
         ),
     ],
 )
