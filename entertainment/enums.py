@@ -68,3 +68,20 @@ class MovieGenres(str, Enum):
     TV_MOVIE = "tv movie"
     WAR = "war"
     WESTERN = "western"
+
+
+class GamesReviewOverall(str, Enum):
+    NEGATIVE = "Negative"
+    MIXED = "Mixed"
+    POSITIVE = "Positive"
+
+
+class GamesReviewDetailed(str, Enum):
+    V_NEGATIVE = "Very Negative"
+    NEGATIVE = "Negative"
+    M_NEGATIVE = "Mostly Negative"
+    MIXED = "Mixed"
+    M_POSITIVE = "Mostly Positive"
+    POSITIVE = "Positive"
+    V_POSITIVE = "Very Positive"
+    O_POSITIVE = "Overwhelmingly Positive"
