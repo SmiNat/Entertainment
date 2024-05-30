@@ -1,8 +1,37 @@
 import datetime
 
 from entertainment.models import Games
-from entertainment.routers.utils import convert_items_list_to_a_sorted_string
 from entertainment.tests.conftest import TestingSessionLocal
+from entertainment.utils import convert_items_list_to_a_sorted_string
+
+
+def game_payload(
+    title: str = "New game",
+    premiere: str = "2011-11-11",
+    developer: str = "Paradox Development Studio",
+    publisher: str | None = "Paradox Interactive",
+    genres: list[str] = ["Action", "Strategy"],
+    game_type: list[str] | None = ["Co-op", "MMO"],
+    price_eur: float | None = 8.99,
+    price_discounted_eur: float | None = None,
+    review_overall: str | None = "Positive",
+    review_detailed: str | None = None,
+    reviews_positive: float | None = None,
+) -> dict:
+    payload = {
+        "title": title,
+        "premiere": premiere,
+        "developer": developer,
+        "publisher": publisher,
+        "genres": genres,
+        "game_type": game_type,
+        "price_eur": price_eur,
+        "price_discounted_eur": price_discounted_eur,
+        "review_overall": review_overall,
+        "review_detailed": review_detailed,
+        "reviews_positive": reviews_positive,
+    }
+    return payload
 
 
 def create_game(
@@ -30,7 +59,7 @@ def create_game(
         developer=developer,
         publisher=publisher,
         genres=genres,
-        type=game_type,
+        game_type=game_type,
         price_eur=price_eur,
         price_discounted_eur=price_discounted_eur,
         review_overall=review_overall,

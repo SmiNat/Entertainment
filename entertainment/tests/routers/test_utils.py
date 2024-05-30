@@ -6,7 +6,10 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy import text
 
-from entertainment.routers.utils import (
+from entertainment.tests.conftest import TestingSessionLocal
+from entertainment.tests.utils_movies import create_movie
+from entertainment.tests.utils_users import create_db_user
+from entertainment.utils import (
     check_country,
     check_date,
     check_if_author_or_admin,
@@ -19,9 +22,6 @@ from entertainment.routers.utils import (
     smart_title,
     validate_field,
 )
-from entertainment.tests.conftest import TestingSessionLocal
-from entertainment.tests.utils_movies import create_movie
-from entertainment.tests.utils_users import create_db_user
 
 
 def test_smart_title():

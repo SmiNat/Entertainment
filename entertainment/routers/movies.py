@@ -15,7 +15,7 @@ from entertainment.database import get_db
 from entertainment.exceptions import DatabaseIntegrityError, RecordNotFoundException
 from entertainment.models import Movies
 from entertainment.routers.auth import get_current_user
-from entertainment.routers.utils import (
+from entertainment.utils import (
     check_country,
     check_date,
     check_if_author_or_admin,
@@ -44,7 +44,7 @@ def fetch_accessible_movie_genres(db: Session = Depends(get_db)) -> list[str]:
 class MovieRequest(BaseModel):
     title: str
     premiere: datetime.date = Field(description="YYYY-MM-DD format.")
-    score: float = Field(default=0, ge=0, le=10, description="IMDB score.")
+    score: float | None = Field(default=0, ge=0, le=10, description="IMDB score.")
     genres: list[str] = Field(max_length=500)
     overview: str | None = Field(default=None, max_length=500, examples=[None])
     crew: str | None = Field(default=None, max_length=500, examples=[None])

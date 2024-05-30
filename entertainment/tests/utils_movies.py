@@ -2,15 +2,15 @@ import logging
 from datetime import datetime
 
 from entertainment.models import Movies
-from entertainment.routers.utils import convert_items_list_to_a_sorted_string
 from entertainment.tests.conftest import TestingSessionLocal
+from entertainment.utils import convert_items_list_to_a_sorted_string
 
 logger = logging.getLogger(__name__)
 
 
 def movie_payload(
     title: str = "Test Movie",
-    premiere: str = "2011-11-11",  # ISO 8601 formatted string
+    premiere: str = "2010-10-10",  # ISO 8601 formatted string
     score: float | None = 8.5,
     genres: list[str] | None = ["Action", "war"],
     overview: str | None = "Test overview",
@@ -39,7 +39,7 @@ def movie_payload(
 
 def create_movie(
     title: str = "Test Movie",
-    premiere: str = "2011-11-11",  # ISO 8601 formatted string
+    premiere: str = "2012-12-12",  # ISO 8601 formatted string
     score: float | None = 8.5,
     genres: list[str] | None = ["Action", "Mystery"],
     overview: str | None = None,

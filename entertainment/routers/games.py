@@ -6,13 +6,19 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from entertainment.database import get_db
 from entertainment.enums import GamesReviewDetailed, GamesReviewOverall
+from entertainment.exceptions import DatabaseIntegrityError
 from entertainment.models import Games
 from entertainment.routers.auth import get_current_user
-from entertainment.routers.utils import get_unique_row_data
+from entertainment.utils import (
+    check_items_list,
+    convert_items_list_to_a_sorted_string,
+    get_unique_row_data,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,19 +41,19 @@ class GameRequest(BaseModel):
     developer: str
     publisher: str | None = Field(default=None, examples=[None])
     genres: list[str] = Field()
-    type: list[str]
-    price_eur: float | None = Field(default=None)
-    price_discounted_eur: float | None = Field(default=None)
-    review_detailed: GamesReviewDetailed
-    review_overall: GamesReviewOverall
+    game_type: list[str] | None
+    price_eur: float | None = Field(default=None, ge=0)
+    price_discounted_eur: float | None = Field(default=None, ge=0)
+    review_overall: GamesReviewOverall | None
+    review_detailed: GamesReviewDetailed | None
     reviews_positive: float | None = Field(default=None, ge=0, le=1)
 
 
 class GameResponse(GameRequest):
     genres: str
-    type: str
-    review_detailed: str
-    review_overall: str
+    game_type: str
+    review_detailed: str | None
+    review_overall: str | None
     id: int
     created_by: str | None
     updated_by: str | None
@@ -92,3 +98,46 @@ async def get_all_games(
         "page": f"{page_number} of {ceil(games.count()/page_size)}",
         "games": results,
     }
+
+
+@router.get("/search", status_code=200)
+async def search_games():
+    pass
+
+
+@router.post("/add", status_code=201, response_model=GameResponse)
+async def add_game(
+    user: user_dependency,
+    db: db_dependency,
+    new_game: GameRequest,
+) -> Games:
+    all_fields = new_game.model_dump()
+
+    # Validate fields: genres and type and convert a list to a string
+    fields_to_validate = ["genres", "game_type"]
+    for field in fields_to_validate:
+        accessible_options = get_unique_row_data(db, "games", field)
+        check_items_list(
+            all_fields[field],
+            accessible_options,
+            error_message=f"Invalid {field}: check 'get choices' for list of accessible {field}.",
+        )
+        result = convert_items_list_to_a_sorted_string(all_fields[field])
+        all_fields[field] = result
+
+    game = Games(**all_fields, created_by=user["username"])
+
+    try:
+        db.add(game)
+        db.commit()
+        db.refresh(game)
+    except IntegrityError:
+        raise DatabaseIntegrityError(
+            extra_data="A game with that title, premiere date and developer already exists in the database."
+        )
+
+    logger.debug(
+        "Game: '%s' was successfully added to database by the '%s' user."
+        % (game.title, user["username"])
+    )
+    return game

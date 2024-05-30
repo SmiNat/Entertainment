@@ -13,7 +13,7 @@ from entertainment.database import get_db
 from entertainment.exceptions import DatabaseIntegrityError, RecordNotFoundException
 from entertainment.models import Books
 from entertainment.routers.auth import get_current_user
-from entertainment.routers.utils import (
+from entertainment.utils import (
     check_if_author_or_admin,
     check_items_list,
     convert_items_list_to_a_sorted_string,

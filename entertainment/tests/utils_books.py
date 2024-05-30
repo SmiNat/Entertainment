@@ -1,8 +1,8 @@
 import logging
 
 from entertainment.models import Books
-from entertainment.routers.utils import convert_items_list_to_a_sorted_string
 from entertainment.tests.conftest import TestingSessionLocal
+from entertainment.utils import convert_items_list_to_a_sorted_string
 
 logger = logging.getLogger(__name__)
 

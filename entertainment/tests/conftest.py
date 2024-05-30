@@ -14,7 +14,7 @@ os.environ["ENV_STATE"] = "test"
 from entertainment.config import config  # noqa: E402
 from entertainment.database import Base, get_db  # noqa: E402
 from entertainment.main import app  # noqa: E402
-from entertainment.models import Books, Movies, Users  # noqa: E402
+from entertainment.models import Books, Games, Movies, Users  # noqa: E402
 from entertainment.routers.auth import create_access_token  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -187,5 +187,31 @@ async def added_book() -> Books:
         db.commit()
         db.refresh(book)
         return book
+    finally:
+        db.close()
+
+
+@pytest.fixture
+async def added_game() -> Games:
+    """Creates games record in the database before running a test."""
+    game = Games(
+        title="New game",
+        premiere=datetime.date(2011, 11, 11),
+        developer="Avalanche Studios",
+        publisher=None,
+        genres="Action, RPG, Simulation, Indie",
+        game_type="Co-op, Steam Cloud, Early Access",
+        price_eur=None,
+        price_discounted_eur=4.99,
+        review_overall=None,
+        review_detailed="Negative",
+        reviews_positive=0.33,
+    )
+    db = TestingSessionLocal()
+    try:
+        db.add(game)
+        db.commit()
+        db.refresh(game)
+        return game
     finally:
         db.close()
