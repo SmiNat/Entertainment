@@ -526,7 +526,7 @@ async def test_update_book_202_update_by_the_admin(
 
 
 @pytest.mark.anyio
-async def test_update_book_403_update_by_the_user_who_is_not_the_book_creator(
+async def test_update_book_403_update_by_the_user_who_is_not_the_book_creator_nor_admin(
     async_client: AsyncClient, added_book: Books, created_user_token: str
 ):
     some_user, token = create_user_and_token(
@@ -581,10 +581,7 @@ async def test_update_book_422_not_unique_book(
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 422
-    assert (
-        "Unique constraint failed. A book with that title and that author already exists in the database."
-        in response.text
-    )
+    assert "UNIQUE constraint failed" in response.text
 
 
 @pytest.mark.parametrize(
@@ -706,7 +703,7 @@ async def test_delete_book_404_book_not_found(
 
 
 @pytest.mark.anyio
-async def test_delete_book_204__by_the_admin_user(
+async def test_delete_book_204_by_the_admin_user(
     async_client: AsyncClient, created_user_token: tuple, added_book: Books
 ):
     # Checking if the book exists in db

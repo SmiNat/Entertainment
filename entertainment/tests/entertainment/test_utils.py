@@ -6,7 +6,10 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy import text
 
-from entertainment.routers.utils import (
+from entertainment.tests.conftest import TestingSessionLocal
+from entertainment.tests.utils_movies import create_movie
+from entertainment.tests.utils_users import create_db_user
+from entertainment.utils import (
     check_country,
     check_date,
     check_if_author_or_admin,
@@ -16,11 +19,15 @@ from entertainment.routers.utils import (
     convert_items_list_to_a_sorted_string,
     convert_list_to_unique_values,
     get_unique_row_data,
+    smart_title,
     validate_field,
 )
-from entertainment.tests.conftest import TestingSessionLocal
-from entertainment.tests.utils_movies import create_movie
-from entertainment.tests.utils_users import create_db_user
+
+
+def test_smart_title():
+    example = "TV Movie, TV movie, RPG, Multi-player, fantasy, World War II"
+    expected_result = "TV Movie, TV Movie, RPG, Multi-player, Fantasy, World War II"
+    assert smart_title(example) == expected_result
 
 
 def test_get_unique_row_data_with_path_argument():
@@ -186,7 +193,7 @@ def test_check_items_list(
     [
         (
             ["item1", "new_item", "Item7", "item1", "new item"],
-            "Item1, Item7, New Item, New_Item",
+            "Item1, Item7, New Item, New_item",
         ),
         ([None, None, None], None),
         (None, None),
@@ -362,10 +369,10 @@ def test_validate_field(
     "example_list, is_value_nested, separator, expected_result",
     [
         (
-            ["A", "kk", "zzz", "A", "gdh", "Bbn", "A", "ZZZ"],
+            ["A", "kk", "a", "zzz", "gdh", "Bbn", "A", "ZZZ"],
             False,
             None,
-            ["A", "Bbn", "Gdh", "Kk", "Zzz"],
+            ["A", "Bbn", "Gdh", "Kk", "ZZZ", "Zzz"],
         ),
         (
             ["Aa, Bb", "kk, Zz", "bB, Ww, aa", "X"],

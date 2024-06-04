@@ -15,7 +15,7 @@ from entertainment.database import get_db
 from entertainment.exceptions import DatabaseIntegrityError, RecordNotFoundException
 from entertainment.models import Movies
 from entertainment.routers.auth import get_current_user
-from entertainment.routers.utils import (
+from entertainment.utils import (
     check_country,
     check_date,
     check_if_author_or_admin,
@@ -44,7 +44,7 @@ def fetch_accessible_movie_genres(db: Session = Depends(get_db)) -> list[str]:
 class MovieRequest(BaseModel):
     title: str
     premiere: datetime.date = Field(description="YYYY-MM-DD format.")
-    score: float = Field(default=0, ge=0, le=10, description="IMDB score.")
+    score: float | None = Field(default=0, ge=0, le=10, description="IMDB score.")
     genres: list[str] = Field(max_length=500)
     overview: str | None = Field(default=None, max_length=500, examples=[None])
     crew: str | None = Field(default=None, max_length=500, examples=[None])
@@ -275,6 +275,7 @@ async def update_movie(
     # Verify if user is authorized to update a movie
     check_if_author_or_admin(user, movie)
 
+    # Get all fields to update and check if genres is not an empty list
     fields_to_update = movie_update.model_dump(exclude_unset=True, exclude_none=True)
     if "genres" in fields_to_update.keys() and all(
         genre is None for genre in fields_to_update["genres"]
@@ -286,21 +287,23 @@ async def update_movie(
         )
     logger.debug("Fields to update: %s" % fields_to_update)
 
+    # Update fields
+    for field, value in fields_to_update.items():
+        logger.debug("Updating: field: %s, value: %s" % (field, value))
+        if field == "genres":
+            # Validate genres and convert a list to a string
+            check_items_list(value, accessible_movie_genres)
+            setattr(movie, field, convert_items_list_to_a_sorted_string(value))
+        else:
+            setattr(movie, field, value)
+    movie.updated_by = user["username"]
+
+    # Insert changes into the database
     try:
-        for field, value in fields_to_update.items():
-            logger.debug("Updating: field: %s, value: %s" % (field, value))
-            if field == "genres":
-                check_items_list(value, accessible_movie_genres)
-                setattr(movie, field, convert_items_list_to_a_sorted_string(value))
-            else:
-                setattr(movie, field, value)
-        movie.updated_by = user["username"]
         db.commit()
         db.refresh(movie)
-    except IntegrityError:
-        raise DatabaseIntegrityError(
-            extra_data="A movie with that title and that premiere date already exists in the database."
-        )
+    except IntegrityError as e:
+        raise DatabaseIntegrityError(detail=str(e.orig))
 
     logger.debug(
         "Movie '%s' (%s) was successfully updated by the '%s' user."

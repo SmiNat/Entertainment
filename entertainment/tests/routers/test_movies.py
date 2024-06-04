@@ -102,7 +102,7 @@ async def test_get_all_movies_pagination(async_client: AsyncClient):
                 "budget": None,
                 "country": "ES",
                 "updated_by": None,
-                "premiere": "2011-11-11",
+                "premiere": "2012-12-12",
                 "title": "3",
                 "genres": "Action, Mystery",
                 "crew": "Test crew",
@@ -416,7 +416,7 @@ async def test_update_movie_202_update_by_the_admin(async_client: AsyncClient):
     """Test if user who is an admin but is not a movie record creator
     can update that movie."""
     # Creating movie record by John_Doe
-    create_movie()
+    movie = create_movie()
     assert check_if_db_movies_table_is_not_empty() is True
 
     # Creating an admin user who is not the author of the movie to update
@@ -436,7 +436,7 @@ async def test_update_movie_202_update_by_the_admin(async_client: AsyncClient):
     with patch("entertainment.routers.movies.get_unique_row_data") as mock_function:
         mock_function.return_value = ["Action", "Adventure", "Comedy", "Romance", "War"]
         response = await async_client.patch(
-            "/movies/Test Movie/2011-11-11",
+            f"/movies/{movie.title}/{movie.premiere}",
             json=payload,
             headers={"Authorization": f"Bearer {admin_token}"},
         )
@@ -450,13 +450,13 @@ async def test_update_movie_403_update_by_the_user_who_is_not_the_movie_creator(
     async_client: AsyncClient, created_token: str
 ):
     # Creating movie record by John_Doe
-    create_movie()
+    movie = create_movie()
     assert check_if_db_movies_table_is_not_empty() is True
 
-    payload = {"title": "Test Movie", "premiere": "2011-11-11"}
+    payload = {"title": movie.title, "premiere": movie.premiere.strftime("%Y-%m-%d")}
 
     response = await async_client.patch(
-        "/movies/Test Movie/2011-11-11",
+        f"/movies/{movie.title}/{movie.premiere}",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -500,14 +500,11 @@ async def test_update_movie_422_not_unique_movie(
     # (created by create_movie func)
     response = await async_client.patch(
         "/movies/Deadpool/2016-02-11",
-        json={"title": title, "premiere": "2011-11-11"},
+        json={"title": title, "premiere": "2012-12-12"},
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 422
-    assert (
-        "Unique constraint failed. A movie with that title and that premiere date "
-        "already exists in the database." in response.json()["detail"]
-    )
+    assert "UNIQUE constraint failed" in response.json()["detail"]
 
 
 @pytest.mark.anyio
@@ -638,15 +635,15 @@ async def test_delete_movie_401_if_not_authenticated(
 @pytest.mark.anyio
 async def test_delete_movie_204_by_the_admin_user(async_client: AsyncClient):
     # Creating a movie by 'John_Doe'
-    create_movie()
-    movie = (
+    movie = create_movie()
+    query = (
         TestingSessionLocal()
         .query(Movies)
-        .filter(Movies.premiere == "2011-11-11", Movies.title == "Test Movie")
+        .filter(Movies.premiere == "2012-12-12", Movies.title == "Test Movie")
         .first()
     )
-    assert movie is not None
-    assert "John_Doe" == movie.created_by
+    assert query is not None
+    assert "John_Doe" == query.created_by
     logger.debug("Movie to delete: '%s' (%s)." % (movie.title, movie.premiere))
 
     # Creating an admin user who is not the author of the movie to delete
@@ -659,7 +656,7 @@ async def test_delete_movie_204_by_the_admin_user(async_client: AsyncClient):
 
     # Calling the endpoint by the admin user
     response = await async_client.delete(
-        "/movies/test movie/2011-11-11",
+        f"/movies/{movie.title}/{movie.premiere}",
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert response.status_code == 204
@@ -683,7 +680,7 @@ async def test_delete_movie_403_delete_by_the_user_who_is_not_the_movie_creator(
 
     # Calling the endpoint by 'testuser'
     response = await async_client.delete(
-        "/movies/test movie/2011-11-11",
+        f"/movies/{movie.title}/{movie.premiere}",
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 403

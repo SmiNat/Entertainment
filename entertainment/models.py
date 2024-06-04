@@ -122,7 +122,7 @@ class Games(Base):
     developer = Column(StrippedString, nullable=False)
     publisher = Column(StrippedString)
     genres = Column(StrippedString, nullable=False)
-    type = Column(StrippedString)
+    game_type = Column(StrippedString)
     price_eur = Column(Float)
     price_discounted_eur = Column(Float)
     review_overall = Column(StrippedString)

@@ -37,9 +37,9 @@ app.add_middleware(CorrelationIdMiddleware)
 
 app.include_router(auth_router)
 app.include_router(books_router)
+app.include_router(games_router)
 app.include_router(movies_router)
 app.include_router(users_router)
-app.include_router(games_router)
 
 
 # Logging the HTTPExceptions

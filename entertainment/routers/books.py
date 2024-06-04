@@ -13,7 +13,7 @@ from entertainment.database import get_db
 from entertainment.exceptions import DatabaseIntegrityError, RecordNotFoundException
 from entertainment.models import Books
 from entertainment.routers.auth import get_current_user
-from entertainment.routers.utils import (
+from entertainment.utils import (
     check_if_author_or_admin,
     check_items_list,
     convert_items_list_to_a_sorted_string,
@@ -137,7 +137,7 @@ async def search_books(
     ),
     exclude_empty_data: bool = Query(
         default=False,
-        description="To exclude from search records with empty rating score or votes.",
+        description="To exclude from search the records with empty rating score or votes.",
     ),
     page: int = Query(default=1, gt=0),
 ):
@@ -232,6 +232,7 @@ async def update_book(
     # Verify if user is authorized to update a book
     check_if_author_or_admin(user, book)
 
+    # Get all fields to update and check if genres is not an empty list
     fields_to_update = book_update.model_dump(exclude_none=True, exclude_unset=True)
     if "genres" in fields_to_update.keys() and all(
         genre is None for genre in fields_to_update["genres"]
@@ -243,22 +244,23 @@ async def update_book(
         )
     logger.debug("Fields to update: %s" % fields_to_update)
 
+    # Update fields
     for field, value in fields_to_update.items():
         logger.debug("Updating: field: %s, value: %s" % (field, value))
         if field == "genres":
+            # Validate genres and convert a list to a string
             check_items_list(value, accessible_book_genres)
             setattr(book, field, convert_items_list_to_a_sorted_string(value))
         else:
             setattr(book, field, value)
     book.updated_by = user["username"]
 
+    # Insert changes into the database
     try:
         db.commit()
         db.refresh(book)
-    except IntegrityError:
-        raise DatabaseIntegrityError(
-            extra_data="A book with that title and that author already exists in the database."
-        )
+    except IntegrityError as e:
+        raise DatabaseIntegrityError(detail=str(e.orig))
 
     logger.debug(
         "Book '%s' (%s) was successfully updated by the '%s' user."

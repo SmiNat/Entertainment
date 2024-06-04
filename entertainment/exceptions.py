@@ -18,8 +18,6 @@ class DatabaseNotEmptyError(Exception):
 class DatabaseIntegrityError(HTTPException):
     """Exception raised with not unique data fields."""
 
-    DETAIL = "Record already exists in the database."
-
     def __init__(
         self,
         status_code: int = status.HTTP_422_UNPROCESSABLE_ENTITY,
