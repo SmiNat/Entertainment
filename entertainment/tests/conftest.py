@@ -206,6 +206,7 @@ async def added_game() -> Games:
         review_overall=None,
         review_detailed="Negative",
         reviews_positive=0.33,
+        created_by="testuser",
     )
     db = TestingSessionLocal()
     try:

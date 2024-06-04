@@ -36,9 +36,9 @@ def game_payload(
 
 def create_game(
     title: str = "Test game",
-    premiere: datetime.date = datetime.datetime(2011, 11, 11),
-    developer: str = "EA Games",
-    publisher: str | None = "EA Games",
+    premiere: datetime.date = datetime.date(2012, 12, 12),
+    developer: str = "CI Games",
+    publisher: str | None = "CI Games",
     genres: list[str] = ["Action", "RPG", "Strategy"],
     game_type: list[str] | None = ["Multi-Player", "MMO"],
     price_eur: float | None = 1.5,

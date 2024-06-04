@@ -71,12 +71,20 @@ class MovieGenres(str, Enum):
 
 
 class GamesReviewOverall(str, Enum):
+    @classmethod
+    def list_of_values(cls):
+        return list(map(lambda c: c.value, cls))
+
     NEGATIVE = "Negative"
     MIXED = "Mixed"
     POSITIVE = "Positive"
 
 
 class GamesReviewDetailed(str, Enum):
+    @classmethod
+    def list_of_values(cls):
+        return list(map(lambda c: c.value, cls))
+
     V_NEGATIVE = "Very Negative"
     NEGATIVE = "Negative"
     M_NEGATIVE = "Mostly Negative"
