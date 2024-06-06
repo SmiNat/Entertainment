@@ -329,7 +329,7 @@ async def test_update_user_400_email_already_taken(
     [("invalid"), ("invalid@"), ("@invalid"), ("sth@invalid")],
 )
 async def test_update_user_422_email_invalid(
-    async_client: AsyncClient, created_user_token: tuple, invalid_email
+    async_client: AsyncClient, created_user_token: tuple, invalid_email: str
 ):
     # Creating a 'testuser' and a token for a 'testuser'
     user, token = created_user_token

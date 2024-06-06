@@ -48,7 +48,7 @@ class FontReset(str, Enum):
     SUFFIX = "\033[0m"
 
 
-class MovieGenres(str, Enum):
+class MovieGenre(str, Enum):
     ACTION = "action"
     ADVENTURE = "adventure"
     ANIMATION = "animation"
@@ -85,11 +85,39 @@ class GamesReviewDetailed(str, Enum):
     def list_of_values(cls):
         return list(map(lambda c: c.value, cls))
 
-    V_NEGATIVE = "Very Negative"
+    VERY_NEGATIVE = "Very Negative"
     NEGATIVE = "Negative"
-    M_NEGATIVE = "Mostly Negative"
+    MOSTLY_NEGATIVE = "Mostly Negative"
     MIXED = "Mixed"
-    M_POSITIVE = "Mostly Positive"
+    MOSTLY_POSITIVE = "Mostly Positive"
     POSITIVE = "Positive"
-    V_POSITIVE = "Very Positive"
-    O_POSITIVE = "Overwhelmingly Positive"
+    VERY_POSITIVE = "Very Positive"
+    CRAZY_POSITIVE = "Overwhelmingly Positive"
+
+
+class EntertainmentCategory(str, Enum):
+    @classmethod
+    def list_of_values(cls):
+        return list(map(lambda c: c.value, cls))
+
+    BOOKS = "Books"
+    GAMES = "Games"
+    MOVIES = "Movies"
+    SONGS = "Songs"
+
+
+class WishlistCategory(str, Enum):
+    NEVER = "Black list"
+    MAYBE = "Maybe someday"
+    DEFINITELY = "Definitely someday"
+    ASAP = "ASAP"
+
+
+class MyRate(str, Enum):
+    TRASH = "Never again"
+    OMG = "Tragedy"
+    NOPE = "Nope"
+    HMMM = "Not bad"
+    NICE = "Nice"
+    AWESOME = "Awesome"
+    GOLD = "Masterpiece"
