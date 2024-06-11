@@ -107,6 +107,10 @@ class EntertainmentCategory(str, Enum):
 
 
 class WishlistCategory(str, Enum):
+    @classmethod
+    def list_of_values(cls):
+        return list(map(lambda c: c.value, cls))
+
     NEVER = "Black list"
     MAYBE = "Maybe someday"
     DEFINITELY = "Definitely someday"
@@ -114,6 +118,10 @@ class WishlistCategory(str, Enum):
 
 
 class MyRate(str, Enum):
+    @classmethod
+    def list_of_values(cls):
+        return list(map(lambda c: c.value, cls))
+
     TRASH = "Never again"
     OMG = "Tragedy"
     NOPE = "Nope"

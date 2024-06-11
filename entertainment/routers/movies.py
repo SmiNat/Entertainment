@@ -246,7 +246,7 @@ async def add_movie(
     return movie
 
 
-@router.patch("/{title}/{premiere}", status_code=202)
+@router.patch("/{title}/{premiere}", status_code=200)
 async def update_movie(
     db: db_dependency,
     user: user_dependency,

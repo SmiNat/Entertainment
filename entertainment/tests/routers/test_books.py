@@ -412,7 +412,7 @@ async def test_add_book_422_invalid_input_data(
     ],
 )
 @pytest.mark.anyio
-async def test_update_book_202(
+async def test_update_book_200(
     async_client: AsyncClient,
     created_user_token: tuple,
     added_book: Books,
@@ -446,7 +446,7 @@ async def test_update_book_202(
             json=payload,
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert response.status_code == 202
+        assert response.status_code == 200
         assert expected_result == response.json()
 
 
@@ -486,7 +486,7 @@ async def test_update_book_404_if_book_not_found(
 
 
 @pytest.mark.anyio
-async def test_update_book_202_update_by_the_record_creator(
+async def test_update_book_200_update_by_the_record_creator(
     async_client: AsyncClient, added_book: Books, created_user_token: str
 ):
     user, token = created_user_token
@@ -499,13 +499,13 @@ async def test_update_book_202_update_by_the_record_creator(
         json={"avg_rating": 1.1},
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert response.status_code == 202
+    assert response.status_code == 200
     assert response.json()["avg_rating"] == 1.1
     assert response.json()["updated_by"] == user["username"]
 
 
 @pytest.mark.anyio
-async def test_update_book_202_update_by_the_admin(
+async def test_update_book_200_update_by_the_admin(
     async_client: AsyncClient, added_book: Books, created_user_token: str
 ):
     admin_user, token = create_user_and_token(
@@ -520,7 +520,7 @@ async def test_update_book_202_update_by_the_admin(
         json={"avg_rating": 1.1},
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert response.status_code == 202
+    assert response.status_code == 200
     assert response.json()["avg_rating"] == 1.1
     assert response.json()["updated_by"] == "admin_user"
 

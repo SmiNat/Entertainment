@@ -8,7 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from entertainment.enums import GamesReviewDetailed
-from entertainment.models import Books, Games, Movies, Songs, Users
+from entertainment.models import Books, Games, Movies, Songs, Users, UsersData
 
 RATES_MODEL_MAP = {
     "Books": [1, 2, 3, 4, 5],
@@ -32,7 +32,7 @@ def validate_rate(rate: str | int, category: str):
     if rate and rate not in RATES_MODEL_MAP[category]:
         raise HTTPException(
             400,
-            f"'{rate}' is not valid official rate. Official rates for '{category}' category: {RATES_MODEL_MAP[category]}.",
+            f"'{rate}' is not a valid official rate. Official rates for '{category}' category: {RATES_MODEL_MAP[category]}.",
         )
 
 
@@ -83,7 +83,7 @@ def get_unique_row_data(
 
 
 def check_if_author_or_admin(
-    user: Users | dict, record: Books | Games | Movies | Songs
+    user: Users | dict, record: Books | Games | Movies | Songs | UsersData
 ):
     """Validates if user is either the author of a given database record or
     if user has 'admin' status. Otherwise raises HTTP Exception."""

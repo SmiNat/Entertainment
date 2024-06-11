@@ -53,7 +53,7 @@ class Books(Base):
     avg_rating = Column(Float)
     num_ratings = Column(Integer)
     first_published = Column(Date)
-    created_by = Column(StrippedString)
+    created_by = Column(StrippedString, nullable=False)
     updated_by = Column(StrippedString)
 
     # user = relationship("UsersData", back_populates="book")
@@ -89,7 +89,7 @@ class Games(Base):
     review_detailed = Column(StrippedString)
     reviews_number = Column(Integer)
     reviews_positive = Column(Float)
-    created_by = Column(StrippedString)
+    created_by = Column(StrippedString, nullable=False)
     updated_by = Column(StrippedString)
 
     # user = relationship("UsersData", back_populates="game")
@@ -120,7 +120,7 @@ class Movies(Base):
     budget = Column(Float)
     revenue = Column(Float)
     country = Column(StrippedString)
-    created_by = Column(StrippedString)
+    created_by = Column(StrippedString, nullable=False)
     updated_by = Column(StrippedString)
 
     # user = relationship("UsersData", back_populates="movie")
@@ -151,7 +151,7 @@ class Songs(Base):
     playlist_genre = Column(StrippedString)
     playlist_subgenre = Column(StrippedString)
     duration_ms = Column(Integer)
-    created_by = Column(StrippedString)
+    created_by = Column(StrippedString, nullable=False)
     updated_by = Column(StrippedString)
 
     # user = relationship("UsersData", back_populates="song")
@@ -209,6 +209,11 @@ class UsersData(Base):
     id = Column(Integer, primary_key=True, index=True, unique=True, autoincrement=True)
     category = Column(Enum(EntertainmentCategory), nullable=False)
     id_number = Column(Integer, nullable=False)
+    db_record = Column(
+        String,
+        nullable=False,
+        comment="A title or any other field that indicates assessed record.",
+    )
     finished = Column(Boolean, default=False)
     wishlist = Column(Enum(WishlistCategory))
     watchlist = Column(Boolean, default=False)
@@ -216,21 +221,19 @@ class UsersData(Base):
     priv_rate = Column(Enum(MyRate))
     publ_comment = Column(String(500))
     priv_notes = Column(String(500))
-    created_by = Column(StrippedString)
     update_timestamp = Column(
         DateTime, default=datetime.datetime.now(), onupdate=datetime.datetime.now()
     )
-    db_record = Column(
-        String,
-        nullable=False,
-        comment="A title or any other field that indicates assessed record.",
-    )
+    created_by = Column(StrippedString, nullable=False)
 
     def get_related_record(self, session: Session):
         model = CATEGORY_MODEL_MAP.get(self.category)
         if model:
-            return session.query(model).get(self.id_number)
+            return session.get(model, self.id_number)
         return None
+
+    def object_as_dict(self):
+        return dict((col, getattr(self, col)) for col in self.__table__.columns.keys())
 
     __table_args__ = (
         UniqueConstraint("category", "id_number", name="_record_uniqueness"),

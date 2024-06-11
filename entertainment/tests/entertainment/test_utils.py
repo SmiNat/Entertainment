@@ -47,49 +47,25 @@ def test_validate_rate_ok(category: str, rate: str | int):
             3,
             "Invalid category. Accessable categories: ['Books', 'Games', 'Songs', 'Movies']",
         ),
-        (
-            "Books",
-            9,
-            "'9' is not valid official rate. Official rates for 'Books' category: [1, 2, 3, 4, 5]",
-        ),
+        ("Books", 9, [1, 2, 3, 4, 5]),
         ("Books", "1", ""),
-        (
-            "Books",
-            "Mixed",
-            "'Mixed' is not valid official rate. Official rates for 'Books' category: [1, 2, 3, 4, 5]",
-        ),
-        (
-            "Games",
-            1,
-            "'1' is not valid official rate. Official rates for 'Games' category: ['Very Negative', 'Negative",
-        ),
-        (
-            "Games",
-            "1",
-            "'1' is not valid official rate. Official rates for 'Games' category: ['Very Negative', 'Negative",
-        ),
-        (
-            "Movies",
-            11,
-            "'11' is not valid official rate. Official rates for 'Movies' category: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]",
-        ),
-        (
-            "Movies",
-            "8",
-            "'8' is not valid official rate. Official rates for 'Movies' category: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]",
-        ),
-        (
-            "Movies",
-            "Mixed",
-            "'Mixed' is not valid official rate. Official rates for 'Movies' category: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]",
-        ),
+        ("Books", "Mixed", [1, 2, 3, 4, 5]),
+        ("Games", 1, "['Very Negative', 'Negative"),
+        ("Games", "1", "['Very Negative', 'Negative"),
+        ("Movies", 11, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
+        ("Movies", "8", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
+        ("Movies", "Mixed", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
     ],
 )
-def test_validate_rate_400(category: str, rate: str | int, exp_result: str):
+def test_validate_rate_400(category: str, rate: str | int, exp_result: str | list):
+    if category == "Songs" or category == "Invalid":
+        exp_response = exp_result
+    else:
+        exp_response = f"'{rate}' is not a valid official rate. Official rates for '{category}' category: {exp_result}"
     with pytest.raises(HTTPException) as exc_info:
         validate_rate(rate, category)
     assert exc_info.value.status_code == 400
-    assert exp_result in exc_info.value.detail
+    assert exp_response in exc_info.value.detail
 
 
 def test_smart_title():
