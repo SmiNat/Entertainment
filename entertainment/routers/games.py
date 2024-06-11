@@ -246,7 +246,7 @@ async def add_game(
     return game
 
 
-@router.patch("/{title}/{premiere}/{developer}", status_code=status.HTTP_202_ACCEPTED)
+@router.patch("/{title}/{premiere}/{developer}", status_code=status.HTTP_200_OK)
 async def update_game(
     db: db_dependency,
     user: user_dependency,

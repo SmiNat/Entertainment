@@ -5,18 +5,20 @@ from sqlalchemy import (
     Column,
     Date,
     DateTime,
+    Enum,
     Float,
-    ForeignKey,
     Index,
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Session
 from sqlalchemy.types import TypeDecorator
 
 from entertainment.database import Base
+from entertainment.enums import EntertainmentCategory, MyRate, WishlistCategory
 
 
 class StrippedString(TypeDecorator):
@@ -35,62 +37,15 @@ class StrippedString(TypeDecorator):
         return StrippedString(self.impl.length)
 
 
-class Users(Base):
-    __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, index=True, unique=True)
-    username = Column(StrippedString, unique=True, index=True, nullable=False)
-    email = Column(StrippedString, unique=True, index=True, nullable=False)
-    first_name = Column(StrippedString, nullable=True)
-    last_name = Column(StrippedString, nullable=True)
-    hashed_password = Column(String, nullable=False)
-    role = Column(StrippedString, default="user")
-    is_active = Column(Boolean, default=True)
-    create_timestamp = Column(DateTime, default=datetime.datetime.now())
-    update_timestamp = Column(
-        DateTime, default=datetime.datetime.now(), onupdate=datetime.datetime.now()
-    )
-
-    data = relationship("UserData", back_populates="user")
-
-    __table_args__ = (
-        Index(
-            "idx_user_lowercased_username",
-            func.lower(username),
-            unique=True,
-        ),
-    )
-
-
-class UserData(Base):
-    __tablename__ = "users_data"
-
-    id = Column(Integer, primary_key=True, index=True, unique=True, autoincrement=True)
-    finished = Column(Boolean, default=False)
-    vote = Column(Integer, nullable=True)
-    notes = Column(StrippedString, nullable=True)
-    create_timestamp = Column(DateTime, default=datetime.datetime.now())
-    update_timestamp = Column(
-        DateTime, default=datetime.datetime.now(), onupdate=datetime.datetime.now()
-    )
-
-    user_id = Column(Integer, ForeignKey("users.id"))
-    movie_id = Column(Integer, ForeignKey("movies.id"))
-    book_id = Column(Integer, ForeignKey("books.id"))
-    song_id = Column(Integer, ForeignKey("songs.id"))
-    game_id = Column(Integer, ForeignKey("games.id"))
-
-    user = relationship("Users", back_populates="data")
-    movie = relationship("Movies", back_populates="user")
-    book = relationship("Books", back_populates="user")
-    song = relationship("Songs", back_populates="user")
-    game = relationship("Games", back_populates="user")
-
-
 class Books(Base):
     __tablename__ = "books"
 
-    id = Column(Integer, primary_key=True, unique=True, autoincrement=True)
+    id = Column(
+        Integer,
+        primary_key=True,
+        unique=True,
+        autoincrement=True,
+    )
     title = Column(StrippedString, nullable=False)
     author = Column(StrippedString, nullable=False)
     description = Column(Text)
@@ -98,10 +53,10 @@ class Books(Base):
     avg_rating = Column(Float)
     num_ratings = Column(Integer)
     first_published = Column(Date)
-    created_by = Column(StrippedString)
+    created_by = Column(StrippedString, nullable=False)
     updated_by = Column(StrippedString)
 
-    user = relationship("UserData", back_populates="book")
+    # user = relationship("UsersData", back_populates="book")
 
     __table_args__ = (
         Index(
@@ -116,7 +71,12 @@ class Books(Base):
 class Games(Base):
     __tablename__ = "games"
 
-    id = Column(Integer, primary_key=True, unique=True, autoincrement=True)
+    id = Column(
+        Integer,
+        primary_key=True,
+        unique=True,
+        autoincrement=True,
+    )
     title = Column(StrippedString, nullable=False)
     premiere = Column(Date, nullable=False)
     developer = Column(StrippedString, nullable=False)
@@ -129,10 +89,10 @@ class Games(Base):
     review_detailed = Column(StrippedString)
     reviews_number = Column(Integer)
     reviews_positive = Column(Float)
-    created_by = Column(StrippedString)
+    created_by = Column(StrippedString, nullable=False)
     updated_by = Column(StrippedString)
 
-    user = relationship("UserData", back_populates="game")
+    # user = relationship("UsersData", back_populates="game")
 
     __table_args__ = (
         Index(
@@ -160,10 +120,10 @@ class Movies(Base):
     budget = Column(Float)
     revenue = Column(Float)
     country = Column(StrippedString)
-    created_by = Column(StrippedString)
+    created_by = Column(StrippedString, nullable=False)
     updated_by = Column(StrippedString)
 
-    user = relationship("UserData", back_populates="movie")
+    # user = relationship("UsersData", back_populates="movie")
 
     __table_args__ = (
         Index(
@@ -191,10 +151,10 @@ class Songs(Base):
     playlist_genre = Column(StrippedString)
     playlist_subgenre = Column(StrippedString)
     duration_ms = Column(Integer)
-    created_by = Column(StrippedString)
+    created_by = Column(StrippedString, nullable=False)
     updated_by = Column(StrippedString)
 
-    user = relationship("UserData", back_populates="song")
+    # user = relationship("UsersData", back_populates="song")
 
     __table_args__ = (
         Index(
@@ -206,3 +166,87 @@ class Songs(Base):
             unique=True,
         ),
     )
+
+
+class Users(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True, unique=True)
+    username = Column(StrippedString, unique=True, index=True, nullable=False)
+    email = Column(StrippedString, unique=True, index=True, nullable=False)
+    first_name = Column(StrippedString, nullable=True)
+    last_name = Column(StrippedString, nullable=True)
+    hashed_password = Column(String, nullable=False)
+    role = Column(StrippedString, default="user")
+    is_active = Column(Boolean, default=True)
+    create_timestamp = Column(DateTime, default=datetime.datetime.now())
+    update_timestamp = Column(
+        DateTime, default=datetime.datetime.now(), onupdate=datetime.datetime.now()
+    )
+
+    # data = relationship("UsersData", back_populates="user")
+
+    __table_args__ = (
+        Index(
+            "idx_user_lowercased_username",
+            func.lower(username),
+            unique=True,
+        ),
+    )
+
+
+CATEGORY_MODEL_MAP = {
+    "Books": Books,
+    "Games": Games,
+    "Songs": Songs,
+    "Movies": Movies,
+}
+
+
+class UsersData(Base):
+    __tablename__ = "users_data"
+
+    id = Column(Integer, primary_key=True, index=True, unique=True, autoincrement=True)
+    category = Column(Enum(EntertainmentCategory), nullable=False)
+    id_number = Column(Integer, nullable=False)
+    db_record = Column(
+        String,
+        nullable=False,
+        comment="A title or any other field that indicates assessed record.",
+    )
+    finished = Column(Boolean, default=False)
+    wishlist = Column(Enum(WishlistCategory))
+    watchlist = Column(Boolean, default=False)
+    official_rate = Column(String())
+    priv_rate = Column(Enum(MyRate))
+    publ_comment = Column(String(500))
+    priv_notes = Column(String(500))
+    update_timestamp = Column(
+        DateTime, default=datetime.datetime.now(), onupdate=datetime.datetime.now()
+    )
+    created_by = Column(StrippedString, nullable=False)
+
+    def get_related_record(self, session: Session):
+        model = CATEGORY_MODEL_MAP.get(self.category)
+        if model:
+            return session.get(model, self.id_number)
+        return None
+
+    def object_as_dict(self):
+        return dict((col, getattr(self, col)) for col in self.__table__.columns.keys())
+
+    __table_args__ = (
+        UniqueConstraint("category", "id_number", name="_record_uniqueness"),
+    )
+
+    # user_id = Column(Integer, ForeignKey("users.id"))
+    # movie_id = Column(Integer, ForeignKey("movies.id"))
+    # book_id = Column(Integer, ForeignKey("books.id"))
+    # song_id = Column(Integer, ForeignKey("songs.id"))
+    # game_id = Column(Integer, ForeignKey("games.id"))
+
+    # user = relationship("Users", back_populates="data")
+    # movie = relationship("Movies", back_populates="user")
+    # book = relationship("Books", back_populates="user")
+    # song = relationship("Songs", back_populates="user")
+    # game = relationship("Games", back_populates="user")

@@ -14,12 +14,12 @@ from entertainment.routers.books import router as books_router
 from entertainment.routers.games import router as games_router
 from entertainment.routers.movies import router as movies_router
 from entertainment.routers.users import router as users_router
+from entertainment.routers.users_data import router as users_data_router
 
-# Setting logger
 LOG_FULL_TRACEBACK = False
 
+# Setting logger
 logger = logging.getLogger(__name__)
-
 configure_logging()
 
 
@@ -35,6 +35,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Entertainment API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CorrelationIdMiddleware)
 
+app.include_router(users_data_router)
 app.include_router(auth_router)
 app.include_router(books_router)
 app.include_router(games_router)

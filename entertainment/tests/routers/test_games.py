@@ -375,7 +375,7 @@ async def test_add_game_422_invalid_input_data(
 
 
 @pytest.mark.anyio
-async def test_update_game_202(
+async def test_update_game_200(
     async_client: AsyncClient, added_game: Games, created_token: str
 ):
     payload = {"publisher": "    Ubisoft"}
@@ -388,7 +388,7 @@ async def test_update_game_202(
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
-    assert response.status_code == 202
+    assert response.status_code == 200
     assert response.json()["id"] == 1
     assert response.json()["publisher"] == "Ubisoft"
     assert response.json()["updated_by"] == "testuser"
@@ -424,7 +424,7 @@ async def test_update_game_404_if_book_not_found(
 
 
 @pytest.mark.anyio
-async def test_update_game_202_update_by_the_admin(
+async def test_update_game_200_update_by_the_admin(
     async_client: AsyncClient, added_game: Games
 ):
     assert added_game.created_by == "testuser"
@@ -437,7 +437,7 @@ async def test_update_game_202_update_by_the_admin(
         json=payload,
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert response.status_code == 202
+    assert response.status_code == 200
     assert "testuser" in response.json()["created_by"]
     assert "admin_user" in response.json()["updated_by"]
 
@@ -603,7 +603,7 @@ async def test_delete_game_404_if_game_not_found(
 
 
 @pytest.mark.anyio
-async def test_delete_game_202_if_deleted_by_admin(
+async def test_delete_game_204_if_deleted_by_admin(
     async_client: AsyncClient,
     added_game: Games,
 ):

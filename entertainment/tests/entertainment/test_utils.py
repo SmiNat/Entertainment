@@ -21,7 +21,51 @@ from entertainment.utils import (
     get_unique_row_data,
     smart_title,
     validate_field,
+    validate_rate,
 )
+
+
+@pytest.mark.parametrize(
+    "category, rate",
+    [
+        ("Books", 1),
+        ("Games", "Mixed"),
+        ("Movies", 6),
+        ("Songs", None),
+    ],
+)
+def test_validate_rate_ok(category: str, rate: str | int):
+    assert validate_rate(rate, category) is None
+
+
+@pytest.mark.parametrize(
+    "category, rate, exp_result",
+    [
+        ("Songs", 1, "No official rate system provided for Songs category"),
+        (
+            "Invalid",
+            3,
+            "Invalid category. Accessable categories: ['Books', 'Games', 'Songs', 'Movies']",
+        ),
+        ("Books", 9, [1, 2, 3, 4, 5]),
+        ("Books", "1", ""),
+        ("Books", "Mixed", [1, 2, 3, 4, 5]),
+        ("Games", 1, "['Very Negative', 'Negative"),
+        ("Games", "1", "['Very Negative', 'Negative"),
+        ("Movies", 11, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
+        ("Movies", "8", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
+        ("Movies", "Mixed", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
+    ],
+)
+def test_validate_rate_400(category: str, rate: str | int, exp_result: str | list):
+    if category == "Songs" or category == "Invalid":
+        exp_response = exp_result
+    else:
+        exp_response = f"'{rate}' is not a valid official rate. Official rates for '{category}' category: {exp_result}"
+    with pytest.raises(HTTPException) as exc_info:
+        validate_rate(rate, category)
+    assert exc_info.value.status_code == 400
+    assert exp_response in exc_info.value.detail
 
 
 def test_smart_title():
@@ -31,7 +75,7 @@ def test_smart_title():
 
 
 def test_get_unique_row_data_with_path_argument():
-    test_path = os.environ.get("DEV_DATABASE_PATH")
+    test_path = os.environ.get("TEST_DATABASE_PATH")
 
     # Creating database initial data
     conn = sqlite3.connect(test_path)

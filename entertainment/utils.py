@@ -7,7 +7,33 @@ from fastapi import HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from entertainment.models import Books, Games, Movies, Songs, Users
+from entertainment.enums import GamesReviewDetailed
+from entertainment.models import Books, Games, Movies, Songs, Users, UsersData
+
+RATES_MODEL_MAP = {
+    "Books": [1, 2, 3, 4, 5],
+    "Games": GamesReviewDetailed.list_of_values(),
+    "Songs": None,
+    "Movies": [x for x in range(1, 11)],
+}
+
+
+def validate_rate(rate: str | int, category: str):
+    if category not in RATES_MODEL_MAP.keys():
+        raise HTTPException(
+            400,
+            f"Invalid category. Accessable categories: {list(RATES_MODEL_MAP.keys())}.",
+        )
+    if category == "Songs" and RATES_MODEL_MAP["Songs"] is None:
+        if rate is not None:
+            raise HTTPException(
+                400, "No official rate system provided for Songs category."
+            )
+    if rate and rate not in RATES_MODEL_MAP[category]:
+        raise HTTPException(
+            400,
+            f"'{rate}' is not a valid official rate. Official rates for '{category}' category: {RATES_MODEL_MAP[category]}.",
+        )
 
 
 def smart_title(text: str):
@@ -57,7 +83,7 @@ def get_unique_row_data(
 
 
 def check_if_author_or_admin(
-    user: Users | dict, record: Books | Games | Movies | Songs
+    user: Users | dict, record: Books | Games | Movies | Songs | UsersData
 ):
     """Validates if user is either the author of a given database record or
     if user has 'admin' status. Otherwise raises HTTP Exception."""

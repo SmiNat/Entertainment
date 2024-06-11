@@ -14,7 +14,7 @@ os.environ["ENV_STATE"] = "test"
 from entertainment.config import config  # noqa: E402
 from entertainment.database import Base, get_db  # noqa: E402
 from entertainment.main import app  # noqa: E402
-from entertainment.models import Books, Games, Movies, Users  # noqa: E402
+from entertainment.models import Books, Games, Movies, Users, UsersData  # noqa: E402
 from entertainment.routers.auth import create_access_token  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -55,6 +55,7 @@ def clean_db():
         db.execute(text("DELETE FROM movies"))
         db.execute(text("DELETE FROM books"))
         db.execute(text("DELETE FROM games"))
+        db.execute(text("DELETE FROM users_data"))
         db.execute(text("DROP TABLE IF EXISTS test_table;"))
         db.commit()
 
@@ -214,5 +215,31 @@ async def added_game() -> Games:
         db.commit()
         db.refresh(game)
         return game
+    finally:
+        db.close()
+
+
+@pytest.fixture
+async def added_users_data(added_book) -> UsersData:
+    """Creates users_data record in the database before running a test."""
+    record = UsersData(
+        category="Books",
+        id_number=1,
+        db_record="New book",
+        finished=True,
+        wishlist="Definitely someday",
+        watchlist=True,
+        official_rate=4,
+        priv_rate="Awesome",
+        publ_comment="underrated book",
+        priv_notes=None,
+        created_by="testuser",
+    )
+    db = TestingSessionLocal()
+    try:
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        return record
     finally:
         db.close()

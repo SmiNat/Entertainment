@@ -356,7 +356,7 @@ async def test_add_movie_422_invalid_input_data(
     ],
 )
 @pytest.mark.anyio
-async def test_update_movie_202(
+async def test_update_movie_200(
     async_client: AsyncClient,
     added_movie: Movies,
     created_user_token: tuple,
@@ -377,7 +377,7 @@ async def test_update_movie_202(
         json=payload,
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert response.status_code == 202
+    assert response.status_code == 200
     assert response.json()["score"] == payload["score"]
     assert response.json()["updated_by"] == user["username"]
 
@@ -412,7 +412,7 @@ async def test_update_movie_404_movie_not_found(
 
 
 @pytest.mark.anyio
-async def test_update_movie_202_update_by_the_admin(async_client: AsyncClient):
+async def test_update_movie_200_update_by_the_admin(async_client: AsyncClient):
     """Test if user who is an admin but is not a movie record creator
     can update that movie."""
     # Creating movie record by John_Doe
@@ -440,7 +440,7 @@ async def test_update_movie_202_update_by_the_admin(async_client: AsyncClient):
             json=payload,
             headers={"Authorization": f"Bearer {admin_token}"},
         )
-        assert response.status_code == 202
+        assert response.status_code == 200
         assert payload["title"] == response.json()["title"]
         assert admin_user.username == response.json()["updated_by"]
 

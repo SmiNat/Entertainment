@@ -47,6 +47,7 @@ def create_game(
     review_detailed: str | None = "Mostly Positive",
     reviews_number: int | None = None,
     reviews_positive: float | None = 0.8,
+    created_by: str = "John_Doe",
 ):
     if isinstance(genres, list):
         genres = convert_items_list_to_a_sorted_string(genres)
@@ -66,6 +67,7 @@ def create_game(
         review_detailed=review_detailed,
         reviews_number=reviews_number,
         reviews_positive=reviews_positive,
+        created_by=created_by,
     )
 
     db = TestingSessionLocal()
