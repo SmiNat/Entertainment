@@ -3,10 +3,14 @@ import datetime
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from entertainment.enums import EntertainmentCategory
+from entertainment.tests.conftest import TestingSessionLocal
 from entertainment.tests.utils_books import create_book
 from entertainment.tests.utils_games import create_game
 from entertainment.tests.utils_movies import create_movie
+from entertainment.tests.utils_songs import create_song
 from entertainment.tests.utils_users import create_db_user
+from entertainment.tests.utils_users_data import create_users_data
 
 
 @pytest.mark.parametrize(
@@ -112,56 +116,127 @@ def test_movies_unique_title_and_premiere(
 @pytest.mark.parametrize(
     "title, artist, album_name, duration, is_error",
     [
-        ("New song", "Some artist", "Album 1", 200, True),
-        (" new song", "some artist   ", "album 1", 200, True),
-        (" new song  ", "   Some Artist", "   album 1  ", 200, True),
-        ("Other song", "Some artist", "Album 1", 200, False),
+        ("New song", "New artist", "New album", 200, True),
+        (" new song", "new artist   ", "new album", 200, True),
+        (" new song  ", "   New Artist", "   new album  ", 200, True),
+        ("Other song", "New artist", "New album", 200, False),
     ],
 )
 def test_songs_unique_title_and_artist_and_album_name_and_duration(
     title: str, artist: str, album_name: str, duration: int, is_error: bool
 ):
-    assert False
+    create_song(
+        title="New song", artist="New artist", album_name="New album", duration_ms=200
+    )
+
+    if is_error:
+        with pytest.raises(IntegrityError) as exc_info:
+            create_song(
+                title=title, artist=artist, album_name=album_name, duration_ms=duration
+            )
+        assert (
+            "(sqlite3.IntegrityError) UNIQUE constraint failed: index 'idx_songs_lowercased_title_artist_album_duration'"
+            in exc_info._excinfo[1]._message()
+        )
+    else:
+        song2 = create_song(
+            title=title, artist=artist, album_name=album_name, duration_ms=duration
+        )
+        assert song2.title == title
 
 
 @pytest.mark.parametrize(
-    "username,  is_error",
+    "username, email, is_error",
     [
-        ("testuser", True),
-        (" testuser", True),
-        ("Other user", False),
+        ("testuser", "1@example.com", True),
+        (" testuser", "2@example.com", True),
+        ("Other user", "3.example.com", False),
     ],
 )
-def test_user_unique_username(username: str, is_error: bool):
+def test_user_unique_username(username: str, email: str, is_error: bool):
     # Creating a db user with username 'Testuser'
-    create_db_user(username="Testuser")
+    create_db_user(username="Testuser", email="test@example.com")
 
     # Trying to create a second user
     if is_error:
         with pytest.raises(IntegrityError) as exc_info:
-            user2 = create_db_user(username=username)
+            user2 = create_db_user(username=username, email=email)
         assert (
             "(sqlite3.IntegrityError) UNIQUE constraint failed: index 'idx_user_lowercased_username'"
             in exc_info._excinfo[1]._message()
         )
     else:
-        user2 = create_db_user(username=username, email="other@email.com")
+        user2 = create_db_user(username=username, email=email)
         assert user2.username == username
 
 
 @pytest.mark.parametrize(
     "category, id_number, is_error",
-    [("Books", 1, False), ("Games", 1, False), ("Movies", 1, True)],
+    [("Books", 1, True), ("Games", 1, True), ("Movies", 1, False), ("Songs", 1, False)],
 )
 def test_usersdata_unique_category_and_id_number(
     category: str, id_number: int, is_error: bool
 ):
-    assert False
+    # Creating a book, game and movie record
+    create_book(title="New book")
+    create_game(title="New game")
+    create_movie(title="New movie")
+    # Creating a users_data for a book and a game
+    assessment_book = create_users_data("Books", 1)
+    assessment_game = create_users_data("Games", 1)
+
+    # Trying to create a second book and game assessment record
+    if is_error:
+        with pytest.raises(IntegrityError) as exc_info:
+            assessment2 = create_users_data(category=category, id_number=id_number)
+        print(exc_info._excinfo[1]._message())
+        assert (
+            "(sqlite3.IntegrityError) UNIQUE constraint failed: users_data.category, users_data.id_number"
+            in exc_info._excinfo[1]._message()
+        )
+    else:
+        assessment2 = create_users_data(category=category, id_number=id_number)
+        assert assessment2 is not None
 
 
 def test_usersdata_get_related_record():
-    assert False
+    db = TestingSessionLocal()
+    # Creating a book and game record
+    book = create_book(title="New book")
+    game = create_game(title="New game")
+    # Creating a users_data for a book, game and movie
+    assessment_book = create_users_data("Books", 1)
+    assessment_game = create_users_data("Games", 1)
+    assessment_movie = create_users_data("Movies", 1)
+
+    assert assessment_book.get_related_record(db).title == book.title
+    assert assessment_game.get_related_record(db).title == game.title
+    assert assessment_movie.get_related_record(db) is None
 
 
 def test_usersdata_object_as_dict():
-    assert False
+    book = create_book(title="New book")
+    assessment_book = create_users_data("Books", 1)
+
+    # Manually setting the update_timestamp for testing
+    assessment_book.update_timestamp = datetime.datetime(
+        2020, 10, 10, 15, 15, 15, 150015
+    )
+
+    exp_result = {
+        "id": 1,
+        "category": EntertainmentCategory.BOOKS,
+        "id_number": 1,
+        "db_record": "New book",
+        "finished": False,
+        "wishlist": None,
+        "watchlist": False,
+        "official_rate": None,
+        "priv_rate": None,
+        "publ_comment": None,
+        "priv_notes": None,
+        "update_timestamp": datetime.datetime(2020, 10, 10, 15, 15, 15, 150015),
+        "created_by": "John_Doe",
+    }
+
+    assert assessment_book.object_as_dict() == exp_result
