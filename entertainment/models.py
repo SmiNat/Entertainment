@@ -146,7 +146,6 @@ class Songs(Base):
     album_id = Column(String)
     album_name = Column(StrippedString, nullable=False)
     album_premiere = Column(Date)
-    playlist_id = Column(String)
     playlist_name = Column(StrippedString)
     playlist_genre = Column(StrippedString)
     playlist_subgenre = Column(StrippedString)

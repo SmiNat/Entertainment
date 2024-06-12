@@ -206,7 +206,6 @@ create_table_query = """
         album_id            VARCHAR,
         album_name          VARCHAR     NOT NULL,
         album_premiere      DATE,
-        playlist_id         VARCHAR,
         playlist_name       VARCHAR,
         playlist_genre      VARCHAR,
         playlist_subgenre   VARCHAR,
@@ -236,6 +235,7 @@ db_songs_temp = {
         "ALTER TABLE songs_temp DROP COLUMN liveness;",
         "ALTER TABLE songs_temp DROP COLUMN valence;",
         "ALTER TABLE songs_temp DROP COLUMN tempo;",
+        "ALTER TABLE songs_temp DROP COLUMN playlist_id;",
     ],
     "add columns": [
         "ALTER TABLE songs_temp ADD COLUMN created_by VARCHAR;",

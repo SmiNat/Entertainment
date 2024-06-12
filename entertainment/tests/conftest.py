@@ -55,6 +55,7 @@ def clean_db():
         db.execute(text("DELETE FROM movies"))
         db.execute(text("DELETE FROM books"))
         db.execute(text("DELETE FROM games"))
+        db.execute(text("DELETE FROM songs"))
         db.execute(text("DELETE FROM users_data"))
         db.execute(text("DROP TABLE IF EXISTS test_table;"))
         db.commit()
