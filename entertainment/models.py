@@ -157,11 +157,10 @@ class Songs(Base):
 
     __table_args__ = (
         Index(
-            "idx_songs_lowercased_title_artist_album_duration",
+            "idx_songs_lowercased_title_artist_album",
             func.lower(title),
             func.lower(artist),
             func.lower(album_name),
-            duration_ms,
             unique=True,
         ),
     )

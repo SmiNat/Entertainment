@@ -223,6 +223,17 @@ df.columns = df.columns.str.strip()
 df.to_sql("songs_temp", conn, if_exists="replace")
 
 db_songs_temp = {
+    "drop duplicated rows": [
+        """
+        DELETE FROM songs_temp
+        WHERE rowid NOT IN
+        (
+        SELECT min(rowid)
+        FROM songs_temp
+        GROUP BY lower(track_name), lower(track_artist), lower(track_album_name)
+        );
+        """
+    ],
     "drop columns": [
         "ALTER TABLE songs_temp DROP COLUMN danceability;",
         "ALTER TABLE songs_temp DROP COLUMN energy;",
@@ -259,17 +270,6 @@ db_songs_temp = {
         "ALTER TABLE songs_temp RENAME COLUMN track_album_id TO album_id;",
         "ALTER TABLE songs_temp RENAME COLUMN track_album_name TO album_name;",
         "ALTER TABLE songs_temp RENAME COLUMN track_album_release_date TO album_premiere;",
-    ],
-    "drop duplicate rows": [
-        """
-        DELETE FROM songs_temp
-        WHERE rowid NOT IN
-        (
-        SELECT min(rowid)
-        FROM songs_temp
-        GROUP BY lower(title), lower(artist), lower(album_name), duration_ms
-        );
-        """
     ],
 }
 execute_commands(db_songs_temp, conn)
