@@ -75,7 +75,9 @@ def test_smart_title():
 
 
 def test_get_unique_row_data_with_path_argument():
-    test_path = os.environ.get("TEST_DATABASE_PATH")
+    test_path = os.path.join(
+        "entertainment/tests/", os.environ.get("TEST_DATABASE_PATH")
+    )
 
     # Creating database initial data
     conn = sqlite3.connect(test_path)
