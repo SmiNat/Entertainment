@@ -129,3 +129,16 @@ class MyRate(str, Enum):
     NICE = "Nice"
     AWESOME = "Awesome"
     GOLD = "Masterpiece"
+
+
+class SongGenres(str, Enum):
+    @classmethod
+    def list_of_values(cls):
+        return list(map(lambda c: c.value, cls))
+
+    EDM = "edm"
+    LATIN = "latin"
+    POP = "pop"
+    R_B = "r&b"
+    RAP = "rap"
+    ROCK = "rock"

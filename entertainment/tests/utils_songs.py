@@ -1,5 +1,3 @@
-import datetime
-
 from entertainment.models import Songs
 from entertainment.tests.conftest import TestingSessionLocal
 
@@ -11,7 +9,7 @@ def song_payload(
     song_popularity: int | None = 80,
     album_id: str | None = None,
     album_name: str = "New album",
-    album_premiere: datetime.date | None = datetime.date(2020, 10, 10),
+    album_premiere: str = "2020-10-10",
     playlist_name: str = "New album",
     playlist_genre: str | None = "rock",
     playlist_subgenre: str | None = "hard rock",
@@ -36,11 +34,11 @@ def song_payload(
 def create_song(
     song_id: str | None = None,
     title: str = "New song",
-    artist: str = "Nw atrist",
+    artist: str = "New artist",
     song_popularity: int | None = 80,
     album_id: str | None = None,
     album_name: str = "New album",
-    album_premiere: datetime.date | None = datetime.date(2020, 10, 10),
+    album_premiere: str | None = "2020-10-10",
     playlist_name: str = "New album",
     playlist_genre: str | None = "rock",
     playlist_subgenre: str | None = "hard rock",

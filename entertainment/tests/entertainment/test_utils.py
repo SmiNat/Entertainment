@@ -18,6 +18,7 @@ from entertainment.utils import (
     check_language,
     convert_items_list_to_a_sorted_string,
     convert_list_to_unique_values,
+    get_genre_by_subgenre,
     get_unique_row_data,
     smart_title,
     validate_field,
@@ -72,6 +73,13 @@ def test_smart_title():
     example = "TV Movie, TV movie, RPG, Multi-player, fantasy, World War II"
     expected_result = "TV Movie, TV Movie, RPG, Multi-player, Fantasy, World War II"
     assert smart_title(example) == expected_result
+    assert smart_title(example, "invalid") == expected_result
+
+
+def test_smart_title_lower():
+    example = "TV Movie, TV movie, RPG, Multi-player, fantasy, World War II"
+    expected_result = "tv movie, tv movie, rpg, multi-player, fantasy, world war ii"
+    assert smart_title(example, "lower") == expected_result
 
 
 def test_get_unique_row_data_with_path_argument():
@@ -122,6 +130,51 @@ def test_get_unique_row_data_with_path_argument():
     assert expected_result == get_unique_row_data(test_path, table_name, "genres")
 
 
+def test_get_unique_row_data_with_path_argument_with_subvalue():
+    test_path = os.path.join(
+        "entertainment/tests/", os.environ.get("TEST_DATABASE_PATH")
+    )
+
+    # Creating database initial data
+    conn = sqlite3.connect(test_path)
+
+    # Drop the table if it exists
+    drop_table = """DROP TABLE IF EXISTS test_table;"""
+    conn.execute(drop_table)
+
+    # Create a new table
+    test_table = """
+    CREATE TABLE test_table (
+    id          INTEGER     PRIMARY KEY,
+    title       VARCHAR,
+    genres      TEXT,
+    sub_genres  TEXT
+    );
+    """
+    conn.execute(test_table)
+
+    # Fill the table with content
+    content = """
+    INSERT INTO test_table (title, genres, sub_genres)
+    VALUES
+        ("First test", "Fiction", "xyz"),
+        ("A new test", "Mythology", "abc"),
+        ("Another test", "Fiction", "xyz"),
+        ("Some test", "Fiction", "aaa");
+    """
+    conn.execute(content)
+
+    conn.commit()
+    conn.close()
+
+    # Testing function get_unique_row_data
+    table_name = "test_table"
+    expected_result = ["aaa", "xyz"]
+    assert expected_result == get_unique_row_data(
+        test_path, table_name, "genres", "sub_genres", "Fiction", "lower"
+    )
+
+
 def test_get_unique_row_data_with_session_argument():
     # Creatina a 'test_table' with 'title' and 'genres' columns
     new_table = """
@@ -158,6 +211,119 @@ def test_get_unique_row_data_with_session_argument():
         ]
         result = get_unique_row_data(session, table_name, "genres")
         assert sorted(expected_result) == sorted(result)
+
+
+def test_get_unique_row_data_with_session_argument_with_subcolumn_value():
+    new_table = """
+    CREATE TABLE test_table (
+    id          INTEGER     PRIMARY KEY,
+    title       VARCHAR,
+    genres      TEXT,
+    sub_genres  TEXT
+    );
+    """
+    new_content = """
+    INSERT INTO test_table (title, genres, sub_genres)
+    VALUES
+        ("First test", "Fiction", "xyz"),
+        ("A new test", "Mythology", "abc"),
+        ("Another test", "Fiction", "xyz"),
+        ("Some test", "Fiction", "aaa");
+    """
+
+    # Using the same session for creating the table, inserting data, and testing
+    with TestingSessionLocal() as session:
+        # Creating table and inserting data
+        session.execute(text(new_table))
+        session.execute(text(new_content))
+        session.commit()
+
+        # Testing if get_unique_row_data will return expected result
+        table_name = "test_table"
+        expected_result = ["xyz", "aaa"]
+        result = get_unique_row_data(
+            session, table_name, "genres", "sub_genres", "Fiction", "lower"
+        )
+        assert sorted(expected_result) == sorted(result)
+
+
+def test_get_genre_by_subgenre_with_session_argument():
+    new_table = """
+    CREATE TABLE test_table (
+    id          INTEGER     PRIMARY KEY,
+    title       VARCHAR,
+    genres      TEXT,
+    sub_genres  TEXT
+    );
+    """
+    new_content = """
+    INSERT INTO test_table (title, genres, sub_genres)
+    VALUES
+        ("First test", "Fiction", "xyz"),
+        ("A new test", "Mythology", "abc"),
+        ("Another test", "Fiction", "xyz"),
+        ("Some test", "Fiction", "aaa");
+    """
+
+    # Using the same session for creating the table, inserting data, and testing
+    with TestingSessionLocal() as session:
+        # Creating table and inserting data
+        session.execute(text(new_table))
+        session.execute(text(new_content))
+        session.commit()
+
+        # Testing if get_genre_by_subgenre will return expected result
+        table_name = "test_table"
+        expected_result = ["Fiction"]
+        result = get_genre_by_subgenre(
+            session, table_name, "genres", "sub_genres", "xyz"
+        )
+        assert sorted(expected_result) == sorted(result)
+
+
+def test_get_genre_by_subgenre_with_path_argument():
+    test_path = os.path.join(
+        "entertainment/tests/", os.environ.get("TEST_DATABASE_PATH")
+    )
+
+    # Creating database initial data
+    conn = sqlite3.connect(test_path)
+
+    # Drop the table if it exists
+    drop_table = """DROP TABLE IF EXISTS test_table;"""
+    conn.execute(drop_table)
+
+    # Create a new table
+    test_table = """
+    CREATE TABLE test_table (
+    id          INTEGER     PRIMARY KEY,
+    title       VARCHAR,
+    genres      TEXT,
+    sub_genres  TEXT
+    );
+    """
+    conn.execute(test_table)
+
+    # Fill the table with content
+    content = """
+    INSERT INTO test_table (title, genres, sub_genres)
+    VALUES
+        ("First test", "Fiction", "xyz"),
+        ("A new test", "Mythology", "abc"),
+        ("Another test", "Fiction", "xyz"),
+        ("Some test", "Fiction", "aaa");
+    """
+    conn.execute(content)
+
+    conn.commit()
+    conn.close()
+
+    # Testing function get_genre_by_subgenre
+    table_name = "test_table"
+    expected_result = ["Mythology"]
+    assert expected_result == get_genre_by_subgenre(
+        test_path, table_name, "genres", "sub_genres", "abc"
+    )
 
 
 @pytest.mark.parametrize(

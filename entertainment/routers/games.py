@@ -198,6 +198,8 @@ async def search_games(
         )
 
     results = games.offset((page_number - 1) * 10).limit(10).all()
+    logger.debug("Database hits (search games): %s." % len(games.all()))
+
     if not results:
         raise HTTPException(404, "Games not found.")
 
@@ -216,7 +218,7 @@ async def add_game(
 ) -> Games:
     all_fields = new_game.model_dump()
 
-    # Validate fields: genres and type and convert a list to a string
+    # Validate fields: genres and game_type and convert a list to a string
     fields_to_validate = ["genres", "game_type"]
     for field in fields_to_validate:
         accessible_options = get_unique_row_data(db, "games", field)

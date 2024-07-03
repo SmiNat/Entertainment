@@ -36,16 +36,41 @@ def validate_rate(rate: str | int, category: str):
         )
 
 
-def smart_title(text: str):
-    return " ".join(i if i.isupper() else i.capitalize() for i in text.split())
+def smart_title(text: str, case_type: str | None = None):
+    if case_type in ["upper", "lower", "capitalize", "title"]:
+        return " ".join(getattr(word, case_type)() for word in text.split())
+    return " ".join(
+        word if word.isupper() else word.capitalize() for word in text.split()
+    )
 
 
 def get_unique_row_data(
-    db_path_or_session: str | Session, table_name: str, column_name: str
+    db_path_or_session: str | Session,
+    table_name: str,
+    main_column_name: str,
+    sub_column_name: str | None = None,
+    main_col_value: str | None = None,
+    case_type: str | None = None,
 ):
-    """Extracts all unique values from a given database table, returns the list of unique column values.
-    If values are stored in rows as a a string separated with commas instead of a list of strings,
-    converts values as a string into a list before returning unique values."""
+    """
+    Extracts all unique values from a given database table, returns the list of unique column values.
+    If values are stored in rows as a string separated with commas instead of a list of strings,
+    converts values as a string into a list before returning unique values.
+
+    If both sub_column_name and main_col_value are provided, extracts unique values from sub_column_name
+    where the value of main_column_name (selected row) equals to main_col_value.
+
+    Parameters:
+        db_path_or_session (str | Session): Database path or SQLAlchemy Session object.
+        table_name (str): The name of the table in the database.
+        main_column_name (str): The name of the main column to query.
+        sub_column_name (str | None): The name of the sub-column to get unique values from, if specified.
+        main_col_value (str | None): The value of the main column to filter by, if specified.
+        case_type (str | None):
+
+    Returns:
+        List: A list of unique values from the specified column(s).
+    """
     all_rows_data = []  # Initialize all_rows_data with an empty list
 
     if isinstance(db_path_or_session, str):
@@ -54,7 +79,13 @@ def get_unique_row_data(
         cursor = conn.cursor()
 
         # Execute the query to get all row values
-        cursor.execute(f"SELECT DISTINCT {column_name} FROM {table_name}")
+        if sub_column_name and main_col_value:
+            cursor.execute(
+                f"SELECT DISTINCT {sub_column_name} FROM {table_name} WHERE {main_column_name} = ?",
+                (main_col_value,),
+            )
+        else:
+            cursor.execute(f"SELECT DISTINCT {main_column_name} FROM {table_name}")
 
         # Fetch all results
         all_rows_data = cursor.fetchall()
@@ -64,8 +95,16 @@ def get_unique_row_data(
 
     elif isinstance(db_path_or_session, Session):
         # Use the SQLAlchemy session to execute the query
-        query = text(f"SELECT DISTINCT {column_name} FROM {table_name}")
-        result = db_path_or_session.execute(query)
+        if sub_column_name and main_col_value:
+            query = text(
+                f"SELECT DISTINCT {sub_column_name} FROM {table_name} WHERE {main_column_name} = :main_col_value"
+            )
+            result = db_path_or_session.execute(
+                query, {"main_col_value": main_col_value}
+            )
+        else:
+            query = text(f"SELECT DISTINCT {main_column_name} FROM {table_name}")
+            result = db_path_or_session.execute(query)
         all_rows_data = result.fetchall()
 
     # Process the fetched values to get unique values
@@ -78,8 +117,62 @@ def get_unique_row_data(
             all_values.update(values)
 
     # Extract unique values from each value string in values list
-    values = convert_list_to_unique_values(list(all_values))
+    values = convert_list_to_unique_values(
+        list(all_values),
+        case_type=case_type,
+    )
     return values
+
+
+def get_genre_by_subgenre(
+    db_path_or_session: str | Session,
+    table_name: str,
+    genre_column_name: str,
+    subgenre_column_name: str,
+    subgenre_value: str,
+):
+    """Extracts the genre name from a given database table based on a subgenre value.
+
+    Parameters:
+        db_path_or_session (str | Session): Database path or SQLAlchemy Session object.
+        table_name (str): The name of the table in the database.
+        genre_column_name (str): The name of the genre column to query.
+        subgenre_column_name (str): The name of the subgenre column to filter by.
+        subgenre_value (str): The value of the subgenre to search for.
+
+    Returns:
+        List: A list of genres matching the subgenre value.
+    """
+    all_rows_data = []  # Initialize all_rows_data with an empty list
+
+    if isinstance(db_path_or_session, str):
+        # Connect to the SQLite database
+        conn = sqlite3.connect(db_path_or_session)
+        cursor = conn.cursor()
+
+        # Execute the query to get the genre based on the subgenre
+        cursor.execute(
+            f"SELECT DISTINCT {genre_column_name} FROM {table_name} WHERE {subgenre_column_name} = ?",
+            (subgenre_value,),
+        )
+
+        # Fetch all results
+        all_rows_data = cursor.fetchall()
+
+        # Close the connection
+        conn.close()
+
+    elif isinstance(db_path_or_session, Session):
+        # Use the SQLAlchemy session to execute the query
+        query = text(
+            f"SELECT DISTINCT {genre_column_name} FROM {table_name} WHERE {subgenre_column_name} = :subgenre_value"
+        )
+        result = db_path_or_session.execute(query, {"subgenre_value": subgenre_value})
+        all_rows_data = result.fetchall()
+
+    # Extract the genre names from the fetched data
+    genres = [row[0] for row in all_rows_data]
+    return genres
 
 
 def check_if_author_or_admin(
@@ -135,11 +228,13 @@ def check_items_list(
     return items_list
 
 
-def convert_items_list_to_a_sorted_string(items: list[str]) -> str | None:
+def convert_items_list_to_a_sorted_string(
+    items: list[str], case_type: str | None = None
+) -> str | None:
     """Converts a list of items into a string of unique sorted items."""
     if not items:
         return None
-    items = list(set(smart_title(item.strip()) for item in items if item))
+    items = list(set(smart_title(item.strip(), case_type) for item in items if item))
     if items == [None] or items == []:
         return None
     items.sort()
@@ -210,6 +305,7 @@ def convert_list_to_unique_values(
     values_to_check: list[str],
     nested_values_inside_strings: bool = True,
     sep: str = ",",
+    case_type: str | None = None,
 ):
     """
     Converts a list of strings to a list of unique values.
@@ -218,16 +314,16 @@ def convert_list_to_unique_values(
     a unique list sorted by value.
     """
     if not nested_values_inside_strings:
-        return sorted(set(smart_title(value) for value in values_to_check))
+        return sorted(set(smart_title(value, case_type) for value in values_to_check))
 
     unique_values = set()
     for value in values_to_check:
         if value:
             if "," not in value:
-                unique_values.add(smart_title(value))
+                unique_values.add(smart_title(value, case_type))
             else:
                 values_list = value.split(sep)
                 for element in values_list:
                     element = str(element).strip()
-                    unique_values.add(smart_title(element))
+                    unique_values.add(smart_title(element, case_type=case_type))
     return sorted(unique_values)

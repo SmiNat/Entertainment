@@ -58,7 +58,7 @@ async def test_get_all_games_404_no_games(async_client: AsyncClient):
     ],
 )
 @pytest.mark.anyio
-async def test_get_all_game_200_with_pagination(
+async def test_get_all_games_200_with_pagination(
     async_client: AsyncClient,
     page_size: int,
     page_number: int,
@@ -87,7 +87,7 @@ async def test_get_all_game_200_with_pagination(
 
 
 @pytest.mark.anyio
-async def test_get_all_game_404_with_pagination(
+async def test_get_all_games_404_with_pagination(
     async_client: AsyncClient,
 ):
     create_game("Game 1")
