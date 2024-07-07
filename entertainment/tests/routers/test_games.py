@@ -409,7 +409,7 @@ async def test_update_game_401_if_not_authenticated(
 
 
 @pytest.mark.anyio
-async def test_update_game_404_if_book_not_found(
+async def test_update_game_404_if_game_not_found(
     async_client: AsyncClient, added_game: Games, created_token: str
 ):
     payload = {"publisher": "Ubisoft"}
@@ -443,7 +443,7 @@ async def test_update_game_200_update_by_the_admin(
 
 
 @pytest.mark.anyio
-async def test_update_game_403_update_by_the_user_who_is_not_the_book_creator_nor_admin(
+async def test_update_game_403_update_by_the_user_who_is_not_the_game_creator_nor_admin(
     async_client: AsyncClient, added_game: Games
 ):
     assert added_game.created_by == "testuser"

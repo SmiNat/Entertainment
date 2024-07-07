@@ -253,9 +253,9 @@ async def update_game(
     db: db_dependency,
     user: user_dependency,
     game_update: UpdateGameRequest,
-    title: str = "",
+    title: str,
+    developer: str,
     premiere: datetime.date = Path(description="Use YYYY-MM-DD, eg. 2024-07-22."),
-    developer: str = "",
 ):
     logger.debug("Game to update: '%s' (%s) by %s." % (title, premiere, developer))
 

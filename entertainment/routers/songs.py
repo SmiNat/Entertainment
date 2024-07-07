@@ -4,16 +4,22 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from entertainment.database import get_db
 from entertainment.enums import SongGenres
-from entertainment.exceptions import DatabaseIntegrityError
+from entertainment.exceptions import DatabaseIntegrityError, RecordNotFoundException
 from entertainment.models import Songs
 from entertainment.routers.auth import get_current_user
-from entertainment.utils import check_date, get_genre_by_subgenre, get_unique_row_data
+from entertainment.utils import (
+    check_date,
+    check_if_author_or_admin,
+    check_items_list,
+    get_genre_by_subgenre,
+    get_unique_row_data,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +56,11 @@ class SongResponse(SongRequest):
 
 class UpdateSongRequest(SongRequest):
     title: str | None = Field(default=None, examples=[None])
-    artit: str | None = Field(default=None, examples=[None])
+    artist: str | None = Field(default=None, examples=[None])
     album_name: str | None = Field(default=None, examples=[None])
+
+    class DictConfig:
+        from_attributes = True
 
 
 class ResponseModel(BaseModel):
@@ -180,11 +189,12 @@ async def add_song(
     # Validate playlist_genre field
     if all_fields["playlist_genre"]:
         accessible_options = get_unique_row_data(db, "songs", "playlist_genre")
-        if all_fields["playlist_genre"] not in accessible_options:
+        if all_fields["playlist_genre"].strip().lower() not in accessible_options:
             raise HTTPException(
                 422,
                 "Invalid 'playlist_genre': check 'genres' for list of accessible 'playlist_genre'.",
             )
+        all_fields["playlist_genre"] = all_fields["playlist_genre"].strip().lower()
     # Validate playlist_subgenre field
     if all_fields["playlist_subgenre"]:
         # Subgenre without genre
@@ -192,7 +202,10 @@ async def add_song(
             accessible_options = get_unique_row_data(
                 db, "songs", "playlist_subgenre", case_type="lower"
             )
-            if all_fields["playlist_subgenre"] not in accessible_options:
+            if (
+                all_fields["playlist_subgenre"].strip().lower()
+                not in accessible_options
+            ):
                 raise HTTPException(
                     422,
                     "Invalid 'playlist_subgenre': check 'genres' for list of accessible 'playlist_subgenre'.",
@@ -215,11 +228,17 @@ async def add_song(
                 all_fields["playlist_genre"],
                 "lower",
             )
-            if all_fields["playlist_subgenre"] not in accessible_options:
+            if (
+                all_fields["playlist_subgenre"].strip().lower()
+                not in accessible_options
+            ):
                 raise HTTPException(
                     422,
                     "Invalid 'playlist_subgenre': check 'genres' for list of accessible 'playlist_subgenre'.",
                 )
+        all_fields["playlist_subgenre"] = (
+            all_fields["playlist_subgenre"].strip().lower()
+        )
 
     song = Songs(**all_fields, created_by=user["username"])
 
@@ -237,3 +256,121 @@ async def add_song(
         % (song.title, user["username"])
     )
     return song
+
+
+@router.patch("/{title}/{artist}/{album}", status_code=200)
+async def update_song(
+    db: db_dependency,
+    user: user_dependency,
+    title: str,
+    artist: str,
+    album: str,
+    song_update: UpdateSongRequest,
+):
+    song = (
+        db.query(Songs)
+        .filter(
+            func.lower(Songs.title) == title.strip().casefold(),
+            func.lower(Songs.artist) == artist.strip().casefold(),
+            func.lower(Songs.album_name) == album.strip().casefold(),
+        )
+        .first()
+    )
+    if not song:
+        raise RecordNotFoundException(
+            extra_data=f"Searched song: '{title}' by {artist} ({album})."
+        )
+
+    # Verify if user is authorized to update a song
+    check_if_author_or_admin(user, song)
+
+    # Get all fields to update
+    fields_to_validate = song_update.model_dump(exclude_unset=True, exclude_none=True)
+    fields_to_update = fields_to_validate.copy()
+
+    if not fields_to_update:
+        raise HTTPException(400, detail="No data input provided.")
+    logger.debug("Fields to update: %s" % fields_to_update)
+
+    # Update fields
+    for field, value in fields_to_update.items():
+        logger.debug("Updating: field: %s, value: %s" % (field, value))
+
+        # Validate premiere date (year or full date)
+        if field == "album_premiere":
+            if not (not value.isdigit() and len(value) == 4):
+                check_date(value)
+
+        # Validate fields: genre and subgenre
+        if field == "playlist_genre":
+            accessible_options = get_unique_row_data(
+                db, "songs", field, case_type="lower"
+            )
+            check_items_list(
+                value.strip().lower(),
+                accessible_options,
+                error_message=f"Invalid {field}: check 'get choices' for list of accessible '{field}'.",
+            )
+            setattr(song, field, value.strip().lower())
+        elif field == "playlist_subgenre":
+            accessible_options = get_unique_row_data(
+                db, "songs", "playlist_subgenre", case_type="lower"
+            )
+            check_items_list(
+                value.strip().lower(),
+                accessible_options,
+                error_message=f"Invalid {field}: check 'get choices' for list of accessible '{field}'.",
+            )
+            setattr(song, field, value.strip().lower())
+        else:
+            setattr(song, field, value.strip())
+    song.updated_by = user["username"]
+
+    # Insert changes into the database
+    try:
+        db.commit()
+        db.refresh(song)
+    except IntegrityError as e:
+        raise DatabaseIntegrityError(detail=str(e.orig))
+
+    logger.debug(
+        "Song: '%s' was successfully updated by the '%s' user."
+        % (song.title, user["username"])
+    )
+    return song
+
+
+@router.delete("/{title}/{artist}/{album}", status_code=204)
+async def delete_song(
+    db: db_dependency,
+    user: user_dependency,
+    title: str,
+    artist: str,
+    album: str,
+):
+    logger.debug("Song to delete: '%s' (%s) by %s." % (title, artist, album))
+
+    song = (
+        db.query(Songs)
+        .filter(
+            func.lower(Songs.title) == title.strip().lower(),
+            func.lower(Songs.artist) == artist.strip().lower(),
+            func.lower(Songs.album_name) == album.strip().lower(),
+        )
+        .first()
+    )
+    if not song:
+        raise RecordNotFoundException(
+            extra_data=f"Searched song: {title} by {artist} ({album})."
+        )
+
+    # Verify if user is authorized to delete a song
+    check_if_author_or_admin(user, song)
+
+    db.delete(song)
+    db.commit()
+
+    logger.debug(
+        "Song '%s' (%s) by %s was successfully deleted by the '%s' user."
+        % (title, album, artist, user["username"])
+    )
