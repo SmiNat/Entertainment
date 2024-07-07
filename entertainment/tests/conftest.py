@@ -53,6 +53,42 @@ def override_get_db():
 app.dependency_overrides[get_db] = override_get_db
 
 
+def create_test_table():
+    with engine.connect() as conn:
+        # Check if movies table exists
+        existing_tables = conn.execute(
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name='movies';")
+        ).fetchall()
+        if existing_tables:
+            # Drop existing movies table to recreate it without title column
+            conn.execute(text("DROP TABLE IF EXISTS movies;"))
+
+        # Create movies table without title column
+        conn.execute(
+            text("""
+            CREATE TABLE movies (
+                id INTEGER PRIMARY KEY,
+                crew TEXT,
+                awards TEXT,
+                director TEXT,
+                category TEXT
+            )
+        """)
+        )
+
+
+def drop_test_table():
+    with engine.connect() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS movies"))
+
+
+@pytest.fixture(scope="module")
+def setup_test_table():
+    create_test_table()
+    yield
+    drop_test_table()
+
+
 # Cleaning db tables after each test
 @pytest.fixture(autouse=True, scope="function")
 def clean_db():

@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from entertainment.database import get_db
@@ -126,7 +126,10 @@ async def add_assessment(
         except ValueError:
             validate_rate(data.official_rate, data.category)
 
-    db_related_record = assessment.get_related_record(db)
+    try:
+        db_related_record = assessment.get_related_record(db)
+    except OperationalError:
+        raise HTTPException(404, f"'{data.category}' has no attribute 'title'.")
     if not db_related_record:
         raise RecordNotFoundException(
             extra_data=f"Searched record: id '{data.id_number}' in {data.category} category."
@@ -140,8 +143,8 @@ async def add_assessment(
         db.commit()
         db.refresh(assessment)
 
-    except AttributeError:
-        raise HTTPException(404, f"'{data.category}' object has no attribute 'title'.")
+    except (AttributeError, OperationalError):
+        raise HTTPException(404, f"'{data.category}' has no attribute 'title'.")
     except IntegrityError:
         raise DatabaseIntegrityError(
             extra_data=f"A record with id '{data.id_number}' from {data.category} category has already been assessed."
