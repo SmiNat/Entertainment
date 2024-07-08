@@ -274,11 +274,11 @@ def test_get_genre_by_subgenre_with_session_argument():
 
         # Testing if get_genre_by_subgenre will return expected result
         table_name = "test_table"
-        expected_result = ["Fiction"]
+        expected_result = "Fiction"
         result = get_genre_by_subgenre(
             session, table_name, "genres", "sub_genres", "xyz"
         )
-        assert sorted(expected_result) == sorted(result)
+        assert expected_result == result
 
 
 def test_get_genre_by_subgenre_with_path_argument():
@@ -320,7 +320,7 @@ def test_get_genre_by_subgenre_with_path_argument():
 
     # Testing function get_genre_by_subgenre
     table_name = "test_table"
-    expected_result = ["Mythology"]
+    expected_result = "Mythology"
     assert expected_result == get_genre_by_subgenre(
         test_path, table_name, "genres", "sub_genres", "abc"
     )

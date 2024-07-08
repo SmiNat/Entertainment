@@ -16,7 +16,6 @@ from entertainment.routers.auth import get_current_user
 from entertainment.utils import (
     check_date,
     check_if_author_or_admin,
-    check_items_list,
     get_genre_by_subgenre,
     get_unique_row_data,
 )
@@ -76,11 +75,11 @@ async def get_playlist_genres(db: db_dependency):
     result = {"genres": [], "subgenres": {}}
 
     for genre, subgenre in data:
-        if genre not in result["genres"]:
+        if genre and genre not in result["genres"]:
             result["genres"].append(genre)
             result["subgenres"][genre] = []
             result["subgenres"][genre].append(subgenre)
-        if subgenre not in result["subgenres"][genre]:
+        if subgenre and subgenre not in result["subgenres"][genre]:
             result["subgenres"][genre].append(subgenre)
 
     result["genres"] = sorted(result["genres"])
@@ -184,28 +183,35 @@ async def add_song(
             not all_fields["album_premiere"].isdigit()
             and len(all_fields["album_premiere"]) == 4
         ):
-            check_date(all_fields["album_premiere"])
+            check_date(
+                all_fields["album_premiere"],
+                error_message="Invalid date format. Enter date in 'YYYY-MM-DD' or 'YYYY'.",
+            )
 
     # Validate playlist_genre field
-    if all_fields["playlist_genre"]:
-        accessible_options = get_unique_row_data(db, "songs", "playlist_genre")
-        if all_fields["playlist_genre"].strip().lower() not in accessible_options:
+    genre = all_fields.get("playlist_genre", None)
+    if genre:
+        genre = genre.strip().lower()
+        accessible_options = get_unique_row_data(
+            db, "songs", "playlist_genre", case_type="lower"
+        )
+        if genre not in accessible_options:
             raise HTTPException(
                 422,
                 "Invalid 'playlist_genre': check 'genres' for list of accessible 'playlist_genre'.",
             )
-        all_fields["playlist_genre"] = all_fields["playlist_genre"].strip().lower()
+        all_fields["playlist_genre"] = genre
+
     # Validate playlist_subgenre field
-    if all_fields["playlist_subgenre"]:
+    subgenre = all_fields.get("playlist_subgenre", None)
+    if subgenre:
+        subgenre = subgenre.strip().lower()
         # Subgenre without genre
-        if not all_fields["playlist_genre"]:
+        if not genre:
             accessible_options = get_unique_row_data(
                 db, "songs", "playlist_subgenre", case_type="lower"
             )
-            if (
-                all_fields["playlist_subgenre"].strip().lower()
-                not in accessible_options
-            ):
+            if subgenre not in accessible_options:
                 raise HTTPException(
                     422,
                     "Invalid 'playlist_subgenre': check 'genres' for list of accessible 'playlist_subgenre'.",
@@ -215,7 +221,7 @@ async def add_song(
                 "songs",
                 "playlist_genre",
                 "playlist_subgenre",
-                all_fields["playlist_subgenre"],
+                subgenre,
             )
             all_fields["playlist_genre"] = genre
         # Subgenre with genre
@@ -225,20 +231,15 @@ async def add_song(
                 "songs",
                 "playlist_genre",
                 "playlist_subgenre",
-                all_fields["playlist_genre"],
+                genre,
                 "lower",
             )
-            if (
-                all_fields["playlist_subgenre"].strip().lower()
-                not in accessible_options
-            ):
+            if subgenre not in accessible_options:
                 raise HTTPException(
                     422,
-                    "Invalid 'playlist_subgenre': check 'genres' for list of accessible 'playlist_subgenre'.",
+                    f"Invalid 'playlist_subgenre' for {genre} genre: check 'genres' for list of accessible 'playlist_subgenre'.",
                 )
-        all_fields["playlist_subgenre"] = (
-            all_fields["playlist_subgenre"].strip().lower()
-        )
+        all_fields["playlist_subgenre"] = subgenre
 
     song = Songs(**all_fields, created_by=user["username"])
 
@@ -278,7 +279,7 @@ async def update_song(
     )
     if not song:
         raise RecordNotFoundException(
-            extra_data=f"Searched song: '{title}' by {artist} ({album})."
+            extra_data=f"Searched song: '{title}' by {artist} (album: {album})."
         )
 
     # Verify if user is authorized to update a song
@@ -292,38 +293,87 @@ async def update_song(
         raise HTTPException(400, detail="No data input provided.")
     logger.debug("Fields to update: %s" % fields_to_update)
 
+    # Validate genre and subgenre fields
+    old_genre = song.playlist_genre
+    old_subgenre = song.playlist_subgenre
+    new_genre = fields_to_update.get("playlist_genre", None)
+    new_subgenre = fields_to_update.get("playlist_subgenre", None)
+
+    if not new_genre and not new_subgenre:
+        pass
+    else:
+        accessible_genres = get_unique_row_data(
+            db, "songs", "playlist_genre", case_type="lower"
+        )
+        if new_genre and not new_subgenre and not old_subgenre:
+            if new_genre.strip().lower() not in accessible_genres:
+                raise HTTPException(
+                    422, "Invalid genre: check 'genres' for list of accessible genres."
+                )
+        elif new_genre:
+            accessible_subgenres = get_unique_row_data(
+                db,
+                "songs",
+                "playlist_genre",
+                "playlist_subgenre",
+                new_genre.strip().lower(),
+                case_type="lower",
+            )
+            if new_subgenre:
+                if new_subgenre.strip().lower() not in accessible_subgenres:
+                    raise HTTPException(
+                        422,
+                        f"Invalid subgenre for given genre. Accessible subgenres for '{new_genre.strip().lower()}' genre: {accessible_subgenres}.",
+                    )
+                fields_to_update["playlist_subgenre"] = new_subgenre.strip().lower()
+            elif old_subgenre:
+                if old_subgenre.strip().lower() not in accessible_subgenres:
+                    raise HTTPException(
+                        422,
+                        f"Invalid new genre with old subgenre. Accessible subgenres for '{new_genre.strip().lower()}' genre: {accessible_subgenres}.",
+                    )
+            fields_to_update["playlist_genre"] = new_genre.strip().lower()
+        elif new_subgenre and not new_genre:
+            all_accessible_subgenres = get_unique_row_data(
+                db,
+                "songs",
+                "playlist_subgenre",
+                case_type="lower",
+            )
+            if new_subgenre.strip().lower() not in all_accessible_subgenres:
+                raise HTTPException(
+                    422,
+                    "Invalid subgenre: check 'genres' for list of accessible subgenres.",
+                )
+            genre = get_genre_by_subgenre(
+                db,
+                "songs",
+                "playlist_genre",
+                "playlist_subgenre",
+                new_subgenre.strip().lower(),
+            )
+            if not old_genre:
+                fields_to_update["playlist_genre"] = genre
+            elif old_genre.strip().lower() != genre:
+                raise HTTPException(
+                    422,
+                    f"Invalid subgenre for song's genre. Update genre for '{genre}' or change subgenre.",
+                )
+            fields_to_update["playlist_subgenre"] = new_subgenre.strip().lower()
+
     # Update fields
     for field, value in fields_to_update.items():
         logger.debug("Updating: field: %s, value: %s" % (field, value))
 
         # Validate premiere date (year or full date)
         if field == "album_premiere":
-            if not (not value.isdigit() and len(value) == 4):
-                check_date(value)
+            if not (value.isdigit() and len(value) == 4):
+                check_date(
+                    value,
+                    error_message="Invalid date format. Enter date in 'YYYY-MM-DD' or 'YYYY'.",
+                )
 
-        # Validate fields: genre and subgenre
-        if field == "playlist_genre":
-            accessible_options = get_unique_row_data(
-                db, "songs", field, case_type="lower"
-            )
-            check_items_list(
-                value.strip().lower(),
-                accessible_options,
-                error_message=f"Invalid {field}: check 'get choices' for list of accessible '{field}'.",
-            )
-            setattr(song, field, value.strip().lower())
-        elif field == "playlist_subgenre":
-            accessible_options = get_unique_row_data(
-                db, "songs", "playlist_subgenre", case_type="lower"
-            )
-            check_items_list(
-                value.strip().lower(),
-                accessible_options,
-                error_message=f"Invalid {field}: check 'get choices' for list of accessible '{field}'.",
-            )
-            setattr(song, field, value.strip().lower())
-        else:
-            setattr(song, field, value.strip())
+        setattr(song, field, value.strip())
     song.updated_by = user["username"]
 
     # Insert changes into the database
@@ -361,7 +411,7 @@ async def delete_song(
     )
     if not song:
         raise RecordNotFoundException(
-            extra_data=f"Searched song: {title} by {artist} ({album})."
+            extra_data=f"Searched song: {title} by {artist} (album: {album})."
         )
 
     # Verify if user is authorized to delete a song

@@ -342,7 +342,6 @@ async def test_add_assessment_404_with_non_existing_attribute_title(
 ):
     """Test if assessing record without title raises 404 with detail:
     '{data.category}' object has no attribute 'title'"""
-    # Skipping for now until I get an idea how to either delete 'title' column from test.db or mock the attribute
 
     # Insert a movie record into the movies table (with no title column)
     with TestingSessionLocal() as db:

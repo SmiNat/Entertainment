@@ -66,7 +66,7 @@ def get_unique_row_data(
         main_column_name (str): The name of the main column to query.
         sub_column_name (str | None): The name of the sub-column to get unique values from, if specified.
         main_col_value (str | None): The value of the main column to filter by, if specified.
-        case_type (str | None):
+        case_type (str | None): Letter size: "upper", "lower", "capitalize", "title".
 
     Returns:
         List: A list of unique values from the specified column(s).
@@ -172,7 +172,8 @@ def get_genre_by_subgenre(
 
     # Extract the genre names from the fetched data
     genres = [row[0] for row in all_rows_data]
-    return genres
+
+    return genres[0]
 
 
 def check_if_author_or_admin(
@@ -190,14 +191,18 @@ def check_if_author_or_admin(
         )
 
 
-def check_date(date_value: str, format: str = "%Y-%m-%d") -> None:
+def check_date(
+    date_value: str,
+    format: str = "%Y-%m-%d",
+    error_message: str = "Invalid date type. Enter date in 'YYYY-MM-DD' format.",
+) -> None:
     """Validates if date field is presented in correct format."""
     try:
         datetime.datetime.strptime(date_value, format).date()
     except ValueError:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Invalid date type. Enter date in 'YYYY-MM-DD' format.",
+            detail=error_message,
         )
 
 

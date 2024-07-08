@@ -234,17 +234,17 @@ async def test_add_song_422_not_unique_song(
         (
             "album_premiere",
             "2020, 10, 10",
-            "Invalid date type. Enter date in 'YYYY-MM-DD' format",
+            "Invalid date format. Enter date in 'YYYY-MM-DD' or 'YYYY'.",
         ),
         (
             "album_premiere",
             "202",
-            "Invalid date type. Enter date in 'YYYY-MM-DD' format",
+            "Invalid date format. Enter date in 'YYYY-MM-DD' or 'YYYY'.",
         ),
         (
             "album_premiere",
             "2020-40-10",
-            "Invalid date type. Enter date in 'YYYY-MM-DD' format",
+            "Invalid date format. Enter date in 'YYYY-MM-DD' or 'YYYY'.",
         ),
         (
             "playlist_genre",
@@ -254,7 +254,7 @@ async def test_add_song_422_not_unique_song(
         (
             "playlist_subgenre",
             "invalid",
-            "Invalid 'playlist_subgenre': check 'genres' for list of accessible 'playlist_subgenre'",
+            "Invalid 'playlist_subgenre' for rock genre: check 'genres' for list of accessible 'playlist_subgenre'",
         ),
         ("duration_ms", -8, "Input should be greater than 0"),
         ("song_popularity", -8, "Input should be greater than or equal to 0"),
@@ -280,6 +280,43 @@ async def test_add_song_422_invalid_input_data(
         )
         assert response.status_code == 422
         assert expected_response in response.text
+
+
+@pytest.mark.anyio
+async def test_add_song_invalid_subgenre_with_no_genre(
+    async_client: AsyncClient, created_token: str
+):
+    payload = song_payload(playlist_genre=None, playlist_subgenre="invalid")
+    response = await async_client.post(
+        "/songs/add",
+        json=payload,
+        headers={"Authorization": f"Bearer {created_token}"},
+    )
+    assert response.status_code == 422
+    assert (
+        "Invalid 'playlist_subgenre': check 'genres' for list of accessible 'playlist_subgenre'"
+        in response.json()["detail"]
+    )
+
+
+@pytest.mark.anyio
+async def test_add_song_subgenre_without_genre(
+    async_client: AsyncClient, created_token: str
+):
+    payload = song_payload(playlist_subgenre="dance pop", playlist_genre=None)
+    with patch("entertainment.routers.songs.get_unique_row_data") as mocked_subgenre:
+        mocked_subgenre.return_value = ["dance pop", "electropop"]
+        with patch("entertainment.routers.songs.get_genre_by_subgenre") as mocked_genre:
+            mocked_genre.return_value = "pop"
+            response = await async_client.post(
+                "/songs/add",
+                json=payload,
+                headers={"Authorization": f"Bearer {created_token}"},
+            )
+            assert response.status_code == 201
+            assert (
+                response.json()["playlist_genre"] == "pop"
+            )  # added by the endpoint mechanism
 
 
 @pytest.mark.anyio
@@ -405,26 +442,44 @@ async def test_update_song_400_if_no_data_to_change(
 
 
 @pytest.mark.parametrize(
-    "payload, exp_response",
+    "case, payload, exp_response",
     [
         (
-            {"playlist_genre": "invalid"},
-            "Invalid playlist_genre: check 'get choices' for list of accessible 'playlist_genre'",
+            "invalid genre with old subgenre",
+            {"playlist_genre": "rap"},
+            "Invalid new genre with old subgenre. Accessible subgenres for 'rap' genre: [",
         ),
         (
+            "invalid subgenre",
             {"playlist_subgenre": "invalid"},
-            "Invalid playlist_subgenre: check 'get choices' for list of accessible 'playlist_subgenre'",
+            "Invalid subgenre: check 'genres' for list of accessible subgenres",
         ),
         (
+            "invalid subgenre (hard rock) for new genre (rap)",
+            {"playlist_subgenre": "hard rock", "playlist_genre": "rap"},
+            "Invalid subgenre for given genre. Accessible subgenres for 'rap' genre: [",
+        ),
+        (
+            "invalid new genre (rap) for old subgenre (dance pop)",
+            {"playlist_genre": "rap"},
+            "Invalid new genre with old subgenre. Accessible subgenres for 'rap' genre: [",
+        ),
+        (
+            "invalid album year",
             {"album_premiere": "999"},
-            "Invalid date type. Enter date in 'YYYY-MM-DD' format",
+            "Invalid date format. Enter date in 'YYYY-MM-DD' or 'YYYY'",
         ),
         (
+            "invalid album date",
             {"album_premiere": "10-10-2020"},
-            "Invalid date type. Enter date in 'YYYY-MM-DD' format",
+            "Invalid date format. Enter date in 'YYYY-MM-DD' or 'YYYY'",
         ),
-        ({"song_popularity": -8}, "Input should be greater than or equal to 0"),
-        ({"duration_ms": -11}, "Input should be greater than 0"),
+        (
+            "invalid popularity",
+            {"song_popularity": -8},
+            "Input should be greater than or equal to 0",
+        ),
+        ("invalid duration", {"duration_ms": -11}, "Input should be greater than 0"),
     ],
 )
 @pytest.mark.anyio
@@ -434,6 +489,7 @@ async def test_update_song_422_incorrect_update_data(
     created_token: str,
     payload: dict,
     exp_response: str,
+    case: str,
 ):
     payload = payload
 
@@ -444,6 +500,55 @@ async def test_update_song_422_incorrect_update_data(
     )
     assert response.status_code == 422
     assert exp_response in response.text
+
+
+@pytest.mark.anyio
+async def test_update_song_422_if_invalid_subgenre_with_old_genre(
+    async_client: AsyncClient,
+    created_token: str,
+    added_song: Songs,
+):
+    payload = {"playlist_subgenre": "hard rock"}
+    with patch("entertainment.routers.songs.get_unique_row_data") as mocked_subgenres:
+        mocked_subgenres.return_value = [
+            "classic rock",
+            "hard rock",
+            "electropop",
+            "dance pop",
+        ]
+        with patch("entertainment.routers.songs.get_genre_by_subgenre") as mocked_genre:
+            mocked_genre.return_value = "rock"
+            response = await async_client.patch(
+                f"/songs/{added_song.title}/{added_song.artist}/{added_song.album_name}",
+                json=payload,
+                headers={"Authorization": f"Bearer {created_token}"},
+            )
+            assert response.status_code == 422
+            assert (
+                "Invalid subgenre for song's genre. Update genre for 'rock' or change subgenre"
+                in response.json()["detail"]
+            )
+
+
+@pytest.mark.anyio
+async def test_update_song_422_if_invalid_genre(
+    async_client: AsyncClient, created_token: str
+):
+    song = create_song(
+        playlist_genre=None, playlist_subgenre=None, created_by="testuser"
+    )
+    payload = {"playlist_genre": "invalid"}
+
+    response = await async_client.patch(
+        f"/songs/{song.title}/{song.artist}/{song.album_name}",
+        json=payload,
+        headers={"Authorization": f"Bearer {created_token}"},
+    )
+    assert response.status_code == 422
+    assert (
+        "Invalid genre: check 'genres' for list of accessible genres"
+        in response.json()["detail"]
+    )
 
 
 @pytest.mark.parametrize(
@@ -514,7 +619,7 @@ async def test_delete_song_404_if_song_not_found(
     )
     assert response.status_code == 404
     assert (
-        f"The record was not found in the database. Searched song: invalid by {added_song.artist} ({added_song.album_name})"
+        f"The record was not found in the database. Searched song: invalid by {added_song.artist} (album: {added_song.album_name})"
         in response.json()["detail"]
     )
 

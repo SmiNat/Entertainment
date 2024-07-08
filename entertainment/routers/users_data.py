@@ -31,10 +31,10 @@ class AssessmentRequest(BaseModel):
     finished: bool = Field(default=False)
     wishlist: WishlistCategory | None = None
     watchlist: bool = Field(default=False)
-    official_rate: str | int | None = None
-    priv_rate: MyRate | None = None
-    publ_comment: str | None = None
-    priv_notes: str | None = None
+    official_rate: str | int | None = Field(default=None, examples=[None])
+    priv_rate: MyRate | None = Field(default=None, examples=[None])
+    publ_comment: str | None = Field(default=None, examples=[None])
+    priv_notes: str | None = Field(default=None, examples=[None])
 
 
 class UserAssessment(AssessmentRequest):
