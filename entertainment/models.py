@@ -145,7 +145,7 @@ class Songs(Base):
     song_popularity = Column(Integer)
     album_id = Column(String)
     album_name = Column(StrippedString, nullable=False)
-    album_premiere = Column(Date)
+    album_premiere = Column(String)  # either 2020-10-10 or just 2020
     playlist_name = Column(StrippedString)
     playlist_genre = Column(StrippedString)
     playlist_subgenre = Column(StrippedString)
@@ -157,11 +157,10 @@ class Songs(Base):
 
     __table_args__ = (
         Index(
-            "idx_songs_lowercased_title_artist_album_duration",
+            "idx_songs_lowercased_title_artist_album",
             func.lower(title),
             func.lower(artist),
             func.lower(album_name),
-            duration_ms,
             unique=True,
         ),
     )

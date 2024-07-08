@@ -34,6 +34,10 @@ def fetch_accessible_book_genres(db: Session = Depends(get_db)) -> list[str]:
     return get_unique_row_data(db, "books", "genres")
 
 
+def get_accessible_book_genres(db: Session = Depends(get_db)):
+    return get_unique_row_data(db, "books", "genres")
+
+
 class BookRequest(BaseModel):
     title: str
     author: str
@@ -54,10 +58,6 @@ class BookRequest(BaseModel):
 
     class DictConfig:
         from_attributes = True
-
-
-def get_accessible_book_genres(db: Session = Depends(get_db)):
-    return get_unique_row_data(db, "books", "genres")
 
 
 class BookResponse(BookRequest):

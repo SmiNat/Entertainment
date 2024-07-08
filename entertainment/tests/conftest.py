@@ -14,7 +14,14 @@ os.environ["ENV_STATE"] = "test"
 from entertainment.config import config  # noqa: E402
 from entertainment.database import Base, get_db  # noqa: E402
 from entertainment.main import app  # noqa: E402
-from entertainment.models import Books, Games, Movies, Users, UsersData  # noqa: E402
+from entertainment.models import (  # noqa: E402
+    Books,
+    Games,
+    Movies,
+    Songs,
+    Users,
+    UsersData,
+)
 from entertainment.routers.auth import create_access_token  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -44,6 +51,42 @@ def override_get_db():
 
 
 app.dependency_overrides[get_db] = override_get_db
+
+
+def create_test_table():
+    with engine.connect() as conn:
+        # Check if movies table exists
+        existing_tables = conn.execute(
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name='movies';")
+        ).fetchall()
+        if existing_tables:
+            # Drop existing movies table to recreate it without title column
+            conn.execute(text("DROP TABLE IF EXISTS movies;"))
+
+        # Create movies table without title column
+        conn.execute(
+            text("""
+            CREATE TABLE movies (
+                id INTEGER PRIMARY KEY,
+                crew TEXT,
+                awards TEXT,
+                director TEXT,
+                category TEXT
+            )
+        """)
+        )
+
+
+def drop_test_table():
+    with engine.connect() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS movies"))
+
+
+@pytest.fixture(scope="module")
+def setup_test_table():
+    create_test_table()
+    yield
+    drop_test_table()
 
 
 # Cleaning db tables after each test
@@ -195,7 +238,7 @@ async def added_book() -> Books:
 
 @pytest.fixture
 async def added_game() -> Games:
-    """Creates games record in the database before running a test."""
+    """Creates game record in the database before running a test."""
     game = Games(
         title="New game",
         premiere=datetime.date(2011, 11, 11),
@@ -216,6 +259,32 @@ async def added_game() -> Games:
         db.commit()
         db.refresh(game)
         return game
+    finally:
+        db.close()
+
+
+@pytest.fixture
+async def added_song() -> Songs:
+    """Creates song record in the database before running a test."""
+    song = Songs(
+        title="A song",
+        artist="Song artist",
+        song_popularity=80,
+        album_id="abcd1234",
+        album_name="Song album",
+        album_premiere="2011-11-11",
+        playlist_name="Singing",
+        playlist_genre="pop",
+        playlist_subgenre="dance pop",
+        duration_ms=222222,
+        created_by="testuser",
+    )
+    db = TestingSessionLocal()
+    try:
+        db.add(song)
+        db.commit()
+        db.refresh(song)
+        return song
     finally:
         db.close()
 

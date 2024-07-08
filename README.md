@@ -6,8 +6,8 @@ Initial data source: [kaggle.com](https://www.kaggle.com/).
 ## Project setup
 
 ### To start API on your own working station follow the steps:
-1) Download GitHub repository.
-2) Install necessery packages from requirements.txt file.
+1) Download GitHub repository (git clone https://github.com/SmiNat/Entertainment).
+2) Install necessery packages from requirements.txt file (pip install -r requirements.txt).
 3) Inside main folder run commend:
 
     *uvicorn entertainment.main:app --reload*
@@ -19,19 +19,15 @@ Initial data source: [kaggle.com](https://www.kaggle.com/).
     **Note:**
 
     At the first app launch, the csv_converter.py file will be used to create
-    database file with tables filled with processed data from kaggle.com selected csv files.
+    database file with tables filled with processed data from kaggle.com (selected csv files).
 
-    The original data are from:
-    - https://www.kaggle.com/datasets/ishikajohari/best-books-10k-multi-genre-data (table: books)
-    - https://www.kaggle.com/datasets/rahuldabholkar/steam-pc-games (table: games)
-    - https://www.kaggle.com/datasets/ashpalsingh1525/imdb-movies-dataset (table: movies)
-    - https://www.kaggle.com/datasets/joebeachcapital/30000-spotify-songs?select=spotify_songs.csv (table: songs)
-
+    The original data files are from https://www.kaggle.com/datasets/
+    (list of all data sources in credentials section).
     Some of the data was changed or deleted from the final database table.
     All changes were made in the csv_converter file.
 
     Because the project uses SQLite as the primary database, some data originally in the form of
-    a list was converted to a string type, with values of which are separated by commas.
+    a list was converted to a string type, with values separated by commas.
 
     **Handling db-journal error:**
 
@@ -45,7 +41,15 @@ Initial data source: [kaggle.com](https://www.kaggle.com/).
 
     *uvicorn entertainment.main:app --reload*
 
-4) Use OpenAPI on http://127.0.0.1:8000 to execute endpoints.
+4) Use OpenAPI on http://127.0.0.1:8000/docs (Swagger) to execute endpoints.
 
 ## Required
 Python3.10
+
+# Credentials
+Special thanks to:
+- ASHPAL SINGH1525, for movies database (https://www.kaggle.com/datasets/ashpalsingh1525/imdb-movies-dataset)
+- RAHUL DABHOLKAR, for games database (https://www.kaggle.com/datasets/rahuldabholkar/steam-pc-games)
+- ISHIKA JOHARI, for books database (https://www.kaggle.com/datasets/ishikajohari/best-books-10k-multi-genre-data)
+- JOAKIM ARVIDSSON, for songs database (https://www.kaggle.com/datasets/joebeachcapital/30000-spotify-songs?select=spotify_songs.csv)
+for sharing data that was used in this project.

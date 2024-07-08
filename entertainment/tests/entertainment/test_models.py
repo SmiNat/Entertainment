@@ -114,33 +114,35 @@ def test_movies_unique_title_and_premiere(
 
 
 @pytest.mark.parametrize(
-    "title, artist, album_name, duration, is_error",
+    "title, artist, album_name, is_error",
     [
-        ("New song", "New artist", "New album", 200, True),
-        (" new song", "new artist   ", "new album", 200, True),
-        (" new song  ", "   New Artist", "   new album  ", 200, True),
-        ("Other song", "New artist", "New album", 200, False),
+        ("New song", "New artist", "New album", True),
+        (" new song", "new artist   ", "new album", True),
+        (" new song  ", "   New Artist", "   new album  ", True),
+        ("Other song", "New artist", "New album", False),
     ],
 )
 def test_songs_unique_title_and_artist_and_album_name_and_duration(
-    title: str, artist: str, album_name: str, duration: int, is_error: bool
+    title: str, artist: str, album_name: str, is_error: bool
 ):
-    create_song(
-        title="New song", artist="New artist", album_name="New album", duration_ms=200
-    )
+    create_song(title="New song", artist="New artist", album_name="New album")
 
     if is_error:
         with pytest.raises(IntegrityError) as exc_info:
             create_song(
-                title=title, artist=artist, album_name=album_name, duration_ms=duration
+                title=title,
+                artist=artist,
+                album_name=album_name,
             )
         assert (
-            "(sqlite3.IntegrityError) UNIQUE constraint failed: index 'idx_songs_lowercased_title_artist_album_duration'"
+            "(sqlite3.IntegrityError) UNIQUE constraint failed: index 'idx_songs_lowercased_title_artist_album'"
             in exc_info._excinfo[1]._message()
         )
     else:
         song2 = create_song(
-            title=title, artist=artist, album_name=album_name, duration_ms=duration
+            title=title,
+            artist=artist,
+            album_name=album_name,
         )
         assert song2.title == title
 

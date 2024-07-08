@@ -11,4 +11,4 @@ python-multipart
 asgi-correlation-id
 python-json-logger
 pycountry
-
+requests

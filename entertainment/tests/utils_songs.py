@@ -1,17 +1,44 @@
-import datetime
-
 from entertainment.models import Songs
 from entertainment.tests.conftest import TestingSessionLocal
 
 
-def create_song(
+def song_payload(
     song_id: str | None = None,
     title: str = "New song",
     artist: str = "Nw atrist",
     song_popularity: int | None = 80,
     album_id: str | None = None,
     album_name: str = "New album",
-    album_premiere: datetime.date | None = datetime.date(2020, 10, 10),
+    album_premiere: str = "2020-10-10",
+    playlist_name: str = "New album",
+    playlist_genre: str | None = "rock",
+    playlist_subgenre: str | None = "hard rock",
+    duration_ms: int | None = 247600,
+):
+    payload = {
+        "song_id": song_id,
+        "title": title,
+        "artist": artist,
+        "song_popularity": song_popularity,
+        "album_id": album_id,
+        "album_name": album_name,
+        "album_premiere": album_premiere,
+        "playlist_name": playlist_name,
+        "playlist_genre": playlist_genre,
+        "playlist_subgenre": playlist_subgenre,
+        "duration_ms": duration_ms,
+    }
+    return payload
+
+
+def create_song(
+    song_id: str | None = None,
+    title: str = "New song",
+    artist: str = "New artist",
+    song_popularity: int | None = 80,
+    album_id: str | None = None,
+    album_name: str = "New album",
+    album_premiere: str | None = "2020-10-10",
     playlist_name: str = "New album",
     playlist_genre: str | None = "rock",
     playlist_subgenre: str | None = "hard rock",

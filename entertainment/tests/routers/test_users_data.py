@@ -1,6 +1,7 @@
 import pytest
 from fastapi.encoders import jsonable_encoder
 from httpx import AsyncClient
+from sqlalchemy import text
 
 from entertainment.models import Books, UsersData
 from entertainment.tests.conftest import TestingSessionLocal
@@ -337,12 +338,48 @@ async def test_add_assessment_400_with_invalid_official_rate(
 
 @pytest.mark.anyio
 async def test_add_assessment_404_with_non_existing_attribute_title(
-    async_client: AsyncClient, created_token: str
+    async_client: AsyncClient, created_token: str, setup_test_table
 ):
     """Test if assessing record without title raises 404 with detail:
     '{data.category}' object has no attribute 'title'"""
-    # Skipping for now until I get an idea how to either delete 'title' column from test.db or mock the attribute
-    assert False
+
+    # Insert a movie record into the movies table (with no title column)
+    with TestingSessionLocal() as db:
+        db.execute(
+            text("""
+            INSERT INTO movies (id, crew, awards, director, category)
+            VALUES (:id, :crew, :awards, :director, :category)
+        """),
+            {
+                "id": 1,
+                "crew": "John Doe",
+                "awards": "Best Picture",
+                "director": "Jane Smith",
+                "category": "Movies",
+            },
+        )
+        db.commit()
+
+    payload = {
+        "category": "Movies",
+        "id_number": 1,
+        "finished": False,
+        "wishlist": None,
+        "watchlist": False,
+        "official_rate": None,
+        "priv_rate": None,
+        "publ_comment": None,
+        "priv_notes": None,
+    }
+
+    response = await async_client.post(
+        "/assess/add",
+        headers={"Authorization": f"Bearer {created_token}"},
+        json=payload,
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "'Movies' has no attribute 'title'."}
 
 
 @pytest.mark.anyio
