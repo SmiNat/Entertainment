@@ -32,7 +32,8 @@ def validate_rate(rate: str | int, category: str):
     if rate and rate not in RATES_MODEL_MAP[category]:
         raise HTTPException(
             400,
-            f"'{rate}' is not a valid official rate. Official rates for '{category}' category: {RATES_MODEL_MAP[category]}.",
+            f"'{rate}' is not a valid official rate. Official rates for '{category}' "
+            f"category: {RATES_MODEL_MAP[category]}.",
         )
 
 
@@ -53,12 +54,15 @@ def get_unique_row_data(
     case_type: str | None = None,
 ):
     """
-    Extracts all unique values from a given database table, returns the list of unique column values.
-    If values are stored in rows as a string separated with commas instead of a list of strings,
-    converts values as a string into a list before returning unique values.
+    Extracts all unique values from a given database table, returns the list of
+    unique column values.
+    If values are stored in rows as a string separated with commas instead of
+    a list of strings, converts values as a string into a list before returning
+    unique values.
 
-    If both sub_column_name and main_col_value are provided, extracts unique values from sub_column_name
-    where the value of main_column_name (selected row) equals to main_col_value.
+    If both sub_column_name and main_col_value are provided, extracts unique values
+    from sub_column_name where the value of main_column_name (selected row) equals
+    to main_col_value.
 
     Parameters:
         db_path_or_session (str | Session): Database path or SQLAlchemy Session object.

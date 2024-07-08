@@ -191,7 +191,6 @@ def test_usersdata_unique_category_and_id_number(
     if is_error:
         with pytest.raises(IntegrityError) as exc_info:
             assessment2 = create_users_data(category=category, id_number=id_number)
-        print(exc_info._excinfo[1]._message())
         assert (
             "(sqlite3.IntegrityError) UNIQUE constraint failed: users_data.category, users_data.id_number"
             in exc_info._excinfo[1]._message()
