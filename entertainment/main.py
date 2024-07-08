@@ -4,8 +4,8 @@ import traceback
 from contextlib import asynccontextmanager
 
 from asgi_correlation_id import CorrelationIdMiddleware
-from fastapi import FastAPI, HTTPException, Request  # noqa: F401
-from fastapi.exception_handlers import http_exception_handler  # noqa: F401
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exception_handlers import http_exception_handler
 
 from entertainment.database import create_db_tables, db_initial_data
 from entertainment.logging_config import configure_logging

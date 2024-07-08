@@ -56,8 +56,6 @@ class Books(Base):
     created_by = Column(StrippedString, nullable=False)
     updated_by = Column(StrippedString)
 
-    # user = relationship("UsersData", back_populates="book")
-
     __table_args__ = (
         Index(
             "idx_books_lowercased_title_author",
@@ -92,8 +90,6 @@ class Games(Base):
     created_by = Column(StrippedString, nullable=False)
     updated_by = Column(StrippedString)
 
-    # user = relationship("UsersData", back_populates="game")
-
     __table_args__ = (
         Index(
             "idx_games_lowercased_title_premiere_developer",
@@ -123,8 +119,6 @@ class Movies(Base):
     created_by = Column(StrippedString, nullable=False)
     updated_by = Column(StrippedString)
 
-    # user = relationship("UsersData", back_populates="movie")
-
     __table_args__ = (
         Index(
             "idx_movies_lowercased_title_premiere",
@@ -153,8 +147,6 @@ class Songs(Base):
     created_by = Column(StrippedString, nullable=False)
     updated_by = Column(StrippedString)
 
-    # user = relationship("UsersData", back_populates="song")
-
     __table_args__ = (
         Index(
             "idx_songs_lowercased_title_artist_album",
@@ -181,8 +173,6 @@ class Users(Base):
     update_timestamp = Column(
         DateTime, default=datetime.datetime.now(), onupdate=datetime.datetime.now()
     )
-
-    # data = relationship("UsersData", back_populates="user")
 
     __table_args__ = (
         Index(
@@ -234,17 +224,7 @@ class UsersData(Base):
         return dict((col, getattr(self, col)) for col in self.__table__.columns.keys())
 
     __table_args__ = (
-        UniqueConstraint("category", "id_number", name="_record_uniqueness"),
+        UniqueConstraint(
+            "category", "id_number", "created_by", name="_record_uniqueness"
+        ),
     )
-
-    # user_id = Column(Integer, ForeignKey("users.id"))
-    # movie_id = Column(Integer, ForeignKey("movies.id"))
-    # book_id = Column(Integer, ForeignKey("books.id"))
-    # song_id = Column(Integer, ForeignKey("songs.id"))
-    # game_id = Column(Integer, ForeignKey("games.id"))
-
-    # user = relationship("Users", back_populates="data")
-    # movie = relationship("Movies", back_populates="user")
-    # book = relationship("Books", back_populates="user")
-    # song = relationship("Songs", back_populates="user")
-    # game = relationship("Games", back_populates="user")
