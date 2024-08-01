@@ -80,19 +80,38 @@ class GamesReviewOverall(str, Enum):
     POSITIVE = "Positive"
 
 
-class GamesReviewDetailed(str, Enum):
+class GamesReviewDetailed(Enum):
     @classmethod
     def list_of_values(cls):
+        return list(map(lambda c: c.value[1], cls))
+
+    @classmethod
+    def full_values(cls):
         return list(map(lambda c: c.value, cls))
 
-    VERY_NEGATIVE = "Very Negative"
-    NEGATIVE = "Negative"
-    MOSTLY_NEGATIVE = "Mostly Negative"
-    MIXED = "Mixed"
-    MOSTLY_POSITIVE = "Mostly Positive"
-    POSITIVE = "Positive"
-    VERY_POSITIVE = "Very Positive"
-    CRAZY_POSITIVE = "Overwhelmingly Positive"
+    @classmethod
+    def _get_all_exceeding_values(cls, value: str):
+        if value.title() not in cls.list_of_values():
+            raise ValueError(
+                f"The value '{value}' not found in the GamesReviewDetailed class."
+            )
+        list_of_values = []
+        append_to_list = False
+        for element in cls.full_values():
+            if value.title() == element[1]:
+                append_to_list = True
+            if append_to_list:
+                list_of_values.append(element[1])
+        return list_of_values
+
+    VERY_NEGATIVE = 1, "Very Negative"
+    NEGATIVE = 2, "Negative"
+    MOSTLY_NEGATIVE = 3, "Mostly Negative"
+    MIXED = 4, "Mixed"
+    MOSTLY_POSITIVE = 5, "Mostly Positive"
+    POSITIVE = 6, "Positive"
+    VERY_POSITIVE = 7, "Very Positive"
+    CRAZY_POSITIVE = 8, "Overwhelmingly Positive"
 
 
 class EntertainmentCategory(str, Enum):
