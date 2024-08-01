@@ -362,7 +362,7 @@ async def test_add_game_422_not_unique_game(
         (
             "review_detailed",
             "Very Cool",
-            "Input should be (1, 'Very Negative'), (2, 'Negative'), (3, 'Mostly Negative')",
+            "Invalid 'review_detailed' field. Accessible input values: ['Very Negative', 'Negative', 'Mostly Negative', ",
         ),
         ("reviews_positive", -8, "Input should be greater than or equal to 0"),
     ],
@@ -528,7 +528,10 @@ async def test_update_game_400_if_no_data_to_change(
             {"review_overall": "invalid"},
             "Input should be 'Negative', 'Mixed' or 'Positive'",
         ),
-        ({"review_detailed": "invalid"}, "Input should be (1, 'Very Negative'), "),
+        (
+            {"review_detailed": "invalid"},
+            "Invalid 'review_detailed' field. Accessible input values: ['Very Negative', 'Negative', 'Mostly Negative', ",
+        ),
         ({"reviews_positive": 11}, "Input should be less than or equal to 1"),
     ],
 )
