@@ -47,7 +47,7 @@ class GameRequest(BaseModel):
     price_eur: float | None = Field(default=None, ge=0)
     price_discounted_eur: float | None = Field(default=None, ge=0)
     review_overall: GamesReviewOverall | None = None
-    review_detailed: GamesReviewDetailed | None = None
+    review_detailed: str | None = None
     reviews_positive: float | None = Field(default=None, ge=0, le=1)
     reviews_number: int | None = Field(default=None, ge=0)
 
@@ -226,6 +226,15 @@ async def add_game(
 ) -> Games:
     all_fields = new_game.model_dump()
 
+    if all_fields["review_detailed"]:
+        available_options = GamesReviewDetailed.list_of_values()
+        if all_fields["review_detailed"] not in available_options:
+            raise HTTPException(
+                422,
+                "Invalid 'review_detailed' field. Accessible input values: %s."
+                % available_options,
+            )
+
     # Validate fields: genres and game_type and convert a list to a string
     fields_to_validate = ["genres", "game_type"]
     for field in fields_to_validate:
@@ -309,6 +318,15 @@ async def update_game(
                 error_message=f"Invalid {field}: check 'get choices' for list of accessible {field}.",
             )
             setattr(game, field, convert_items_list_to_a_sorted_string(value))
+        elif field == "review_detailed":
+            available_options = GamesReviewDetailed.list_of_values()
+            if value not in available_options:
+                raise HTTPException(
+                    422,
+                    "Invalid 'review_detailed' field. Accessible input values: %s."
+                    % available_options,
+                )
+            setattr(game, field, value)
         else:
             setattr(game, field, value)
     game.updated_by = user["username"]
