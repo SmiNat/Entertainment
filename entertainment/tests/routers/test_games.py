@@ -218,6 +218,28 @@ async def test_search_games_scenarios(
 
 
 @pytest.mark.anyio
+async def test_search_games_scenarios_review_detailed_test(async_client: AsyncClient):
+    game1 = create_game("Game 1", developer="Ubisoft", review_detailed="Positive")
+    game2 = create_game("New title", review_detailed="Negative")
+    game3 = create_game(publisher="Avalanche", review_detailed="Mostly Positive")
+    game4 = create_game("Test", review_detailed="Very Positive")
+
+    query_params = {"review_detailed": "Positive"}
+    exp_result = {
+        "number_of_games": 2,
+        "page": "1 of 1",
+        "games": [
+            jsonable_encoder(game1, exclude_none=True),
+            jsonable_encoder(game4, exclude_none=True),
+        ],
+    }
+
+    response = await async_client.get("/games/search", params=query_params)
+    assert response.status_code == 200
+    assert response.json() == exp_result
+
+
+@pytest.mark.anyio
 async def test_search_games_pagination(async_client: AsyncClient):
     # Creating 11 gaees in db
     games = []
@@ -340,7 +362,7 @@ async def test_add_game_422_not_unique_game(
         (
             "review_detailed",
             "Very Cool",
-            "Input should be 'Very Negative', 'Negative', 'Mostly Negative'",
+            "Input should be (1, 'Very Negative'), (2, 'Negative'), (3, 'Mostly Negative')",
         ),
         ("reviews_positive", -8, "Input should be greater than or equal to 0"),
     ],
@@ -506,7 +528,7 @@ async def test_update_game_400_if_no_data_to_change(
             {"review_overall": "invalid"},
             "Input should be 'Negative', 'Mixed' or 'Positive'",
         ),
-        ({"review_detailed": "invalid"}, "Input should be 'Very Negative'"),
+        ({"review_detailed": "invalid"}, "Input should be (1, 'Very Negative'), "),
         ({"reviews_positive": 11}, "Input should be less than or equal to 1"),
     ],
 )

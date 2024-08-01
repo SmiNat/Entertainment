@@ -131,7 +131,9 @@ async def search_games(
         default=None, enum=["Negative", "Mixed", "Positive"]
     ),
     review_detailed: str | None = Query(
-        default=None, enum=GamesReviewDetailed.list_of_values()
+        default=None,
+        enum=GamesReviewDetailed.list_of_values(),
+        description="The value of detailed review (or any above).",
     ),
     reviews_number: int | None = Query(
         default=None, description="Minimal number of reviews."
@@ -166,7 +168,7 @@ async def search_games(
         "genres",
         "game_type",
         "review_overall",
-        "review_detailed",
+        # "review_detailed",
     ]
     gte_fields = ["reviews_number", "reviews_positive"]
 
@@ -196,6 +198,12 @@ async def search_games(
             if order_type == "descending"
             else games.order_by(order_by)
         )
+
+    if review_detailed:
+        searched_reviews = GamesReviewDetailed._get_all_exceeding_values(
+            review_detailed
+        )
+        games = games.filter(Games.review_detailed.in_(searched_reviews))
 
     results = games.offset((page_number - 1) * 10).limit(10).all()
     logger.debug("Database hits (search games): %s." % len(games.all()))
