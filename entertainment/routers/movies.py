@@ -188,11 +188,15 @@ async def search_movies(
 
     if exclude_empty_data:
         query = query.filter(Movies.score >= score_ge)
+        if crew is not None:
+            query = query.filter(Movies.crew.icontains(crew))
     else:
         query = query.filter(or_(Movies.score >= score_ge, Movies.score.is_(None)))
+        if crew is not None:
+            query = query.filter(
+                or_(Movies.crew.icontains(crew), Movies.crew.is_(None))
+            )
 
-    if crew is not None:
-        query = query.filter(Movies.crew.icontains(crew))
     if genre_primary is not None:
         query = query.filter(Movies.genres.icontains(genre_primary))
     if genre_secondary is not None:
