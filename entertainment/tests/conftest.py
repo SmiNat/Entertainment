@@ -40,17 +40,32 @@ Base.metadata.create_all(bind=engine)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+# # Overriding database connection for all of the endpoins
+# def override_get_db():
+#     """Sets a clean db session for each test."""
+#     db = TestingSessionLocal()
+#     try:
+#         yield db
+#     finally:
+#         db.close()
+
+
+# app.dependency_overrides[get_db] = override_get_db
+
+
 # Overriding database connection for all of the endpoins
-def override_get_db():
+@pytest.fixture(scope="function")
+def db_session():
     """Sets a clean db session for each test."""
+
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+
     db = TestingSessionLocal()
     try:
         yield db
     finally:
         db.close()
-
-
-app.dependency_overrides[get_db] = override_get_db
 
 
 def create_test_table():
@@ -114,11 +129,19 @@ def anyio_backend():
     return "asyncio"
 
 
+# # Creating test clients
+# @pytest.fixture
+# def client() -> Generator:
+#     """Yield TestClient() on tested app."""
+#     # app.dependency_overrides[get_db] = override_get_db
+#     yield TestClient(app)
+
+
 # Creating test clients
 @pytest.fixture
-def client() -> Generator:
+def client(db_session) -> Generator:
     """Yield TestClient() on tested app."""
-    # app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_db] = lambda: db_session
     yield TestClient(app)
 
 
