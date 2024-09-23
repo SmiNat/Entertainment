@@ -406,7 +406,7 @@ async def test_update_game_200(
     assert added_game.updated_by is None
 
     response = await async_client.patch(
-        f"/games/{added_game.title}/{added_game.premiere}/{added_game.developer}",
+        f"/games/update/{added_game.title}/{added_game.premiere}/{added_game.developer}",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -423,7 +423,7 @@ async def test_update_game_401_if_not_authenticated(
     payload = {"publisher": "Ubisoft"}
 
     response = await async_client.patch(
-        f"/games/{added_game.title}/{added_game.premiere}/{added_game.developer}",
+        f"/games/update/{added_game.title}/{added_game.premiere}/{added_game.developer}",
         json=payload,
     )
     assert response.status_code == 401
@@ -437,7 +437,7 @@ async def test_update_game_404_if_game_not_found(
     payload = {"publisher": "Ubisoft"}
 
     response = await async_client.patch(
-        f"/games/invalid/{added_game.premiere}/{added_game.developer}",
+        f"/games/update/invalid/{added_game.premiere}/{added_game.developer}",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -455,7 +455,7 @@ async def test_update_game_200_update_by_the_admin(
     payload = {"publisher": "Ubisoft"}
 
     response = await async_client.patch(
-        f"/games/{added_game.title}/{added_game.premiere}/{added_game.developer}",
+        f"/games/update/{added_game.title}/{added_game.premiere}/{added_game.developer}",
         json=payload,
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -474,7 +474,7 @@ async def test_update_game_403_update_by_the_user_who_is_not_the_game_creator_no
     payload = {"publisher": "Ubisoft"}
 
     response = await async_client.patch(
-        f"/games/{added_game.title}/{added_game.premiere}/{added_game.developer}",
+        f"/games/update/{added_game.title}/{added_game.premiere}/{added_game.developer}",
         json=payload,
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -495,7 +495,7 @@ async def test_update_game_422_not_unique_game(
     payload = {"developer": "some developer"}
 
     response = await async_client.patch(
-        f"/games/{added_game.title}/{added_game.premiere}/{added_game.developer}",
+        f"/games/update/{added_game.title}/{added_game.premiere}/{added_game.developer}",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -510,7 +510,7 @@ async def test_update_game_400_if_no_data_to_change(
     payload = {"genres": [None, None], "game_type": [None, None]}
 
     response = await async_client.patch(
-        f"/games/{added_game.title}/{added_game.premiere}/{added_game.developer}",
+        f"/games/update/{added_game.title}/{added_game.premiere}/{added_game.developer}",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -546,7 +546,7 @@ async def test_update_game_422_incorrect_update_data(
     payload = payload
 
     response = await async_client.patch(
-        f"/games/{added_game.title}/{added_game.premiere}/{added_game.developer}",
+        f"/games/update/{added_game.title}/{added_game.premiere}/{added_game.developer}",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -583,7 +583,7 @@ async def test_delete_game_204(
     assert game is not None
 
     response = await async_client.delete(
-        f"/games/{title}/{added_game.premiere}/{developer}",
+        f"/games/delete/{title}/{added_game.premiere}/{developer}",
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 204
@@ -606,7 +606,7 @@ async def test_delete_game_401_if_not_authenticated(
     added_game: Games,
 ):
     response = await async_client.delete(
-        f"/games/{added_game.title}/{added_game.premiere}/{added_game.developer}",
+        f"/games/delete/{added_game.title}/{added_game.premiere}/{added_game.developer}",
     )
     assert response.status_code == 401
     assert "Not authenticated" in response.json()["detail"]
@@ -617,7 +617,7 @@ async def test_delete_game_404_if_game_not_found(
     async_client: AsyncClient, added_game: Games, created_token: str
 ):
     response = await async_client.delete(
-        f"/games/invalid/{added_game.premiere}/{added_game.developer}",
+        f"/games/delete/invalid/{added_game.premiere}/{added_game.developer}",
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 404
@@ -636,7 +636,7 @@ async def test_delete_game_204_if_deleted_by_admin(
     assert added_game.created_by != user.username
 
     response = await async_client.delete(
-        f"/games/{added_game.title}/{added_game.premiere}/{added_game.developer}",
+        f"/games/delete/{added_game.title}/{added_game.premiere}/{added_game.developer}",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 204
@@ -662,7 +662,7 @@ async def test_delete_game_403_forbidden_if_not_admin_or_game_creator(
     assert added_game.created_by != user.username
 
     response = await async_client.delete(
-        f"/games/{added_game.title}/{added_game.premiere}/{added_game.developer}",
+        f"/games/delete/{added_game.title}/{added_game.premiere}/{added_game.developer}",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 403

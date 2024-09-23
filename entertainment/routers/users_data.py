@@ -158,7 +158,9 @@ async def add_assessment(
     return assessment
 
 
-@router.patch("/{category}/{id_number}", status_code=200, response_model=ResponseModel)
+@router.patch(
+    "/update/{category}/{id_number}", status_code=200, response_model=ResponseModel
+)
 async def update_assessment(
     db: db_dependency,
     user: user_dependency,
@@ -225,7 +227,7 @@ async def update_assessment(
     return response_data
 
 
-@router.delete("/{category}/{id_number}", status_code=204)
+@router.delete("/delete/{category}/{id_number}", status_code=204)
 async def delete_assessment(
     db: db_dependency,
     user: user_dependency,

@@ -246,7 +246,7 @@ async def add_movie(
     return movie
 
 
-@router.patch("/{title}/{premiere}", status_code=200)
+@router.patch("/update/{title}/{premiere}", status_code=200)
 async def update_movie(
     db: db_dependency,
     user: user_dependency,
@@ -313,7 +313,7 @@ async def update_movie(
     return movie
 
 
-@router.delete("/{title}/{premiere}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/delete/{title}/{premiere}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_movie(
     title: str, premiere: str, db: db_dependency, user: user_dependency
 ):

@@ -205,7 +205,7 @@ async def add_book(
     return book
 
 
-@router.patch("/{title}/{author}", status_code=status.HTTP_200_OK)
+@router.patch("/update/{title}/{author}", status_code=status.HTTP_200_OK)
 async def update_book(
     title: str,
     author: str,
@@ -270,7 +270,7 @@ async def update_book(
     return book
 
 
-@router.delete("/{title}/{author}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/delete/{title}/{author}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_book(
     db: db_dependency, user: user_dependency, title: str, author: str
 ):
