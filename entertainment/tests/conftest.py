@@ -45,9 +45,6 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 def db_session():
     """Sets a clean db session for each test."""
 
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-
     db = TestingSessionLocal()
     try:
         yield db

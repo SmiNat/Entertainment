@@ -4,11 +4,12 @@
 # inserting the final data to final db tables.
 
 import logging
-import os
 import sqlite3
 
 import chardet
 import pandas as pd
+
+from entertainment.config import config
 
 pd.set_option("display.width", 300)
 pd.set_option("display.max_columns", 15)
@@ -62,7 +63,7 @@ def switch_and_drop_table(table_from: str, table_to: str):
 
 
 # Opening connection to a database
-conn = sqlite3.connect(str(os.environ.get("DEV_DATABASE_PATH")))
+conn = sqlite3.connect(str(config.DATABASE_PATH))
 cursor = conn.cursor()
 
 
