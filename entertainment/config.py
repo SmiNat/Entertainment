@@ -2,7 +2,7 @@
 For more flexibility in using application with different environments
 (development, tests or production) we use config.py file together with .env file.
 Depending on the purpose of using the application, change ENV_STATE variable
-in the .env file to either dev or prod.
+in the .env file to either dev or prod or test.
 Tests are automatically set on test state.
 """
 
@@ -33,7 +33,6 @@ class ProdConfig(GlobalConfig):
 
 
 class TestConfig(GlobalConfig):
-    DATABASE_URL: str = "sqlite:///test.db"
     DB_FORCE_ROLL_BACK: bool = True
 
     model_config = SettingsConfigDict(env_prefix="TEST_")
