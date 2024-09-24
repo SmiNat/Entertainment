@@ -259,7 +259,7 @@ async def add_song(
     return song
 
 
-@router.patch("/{title}/{artist}/{album}", status_code=200)
+@router.patch("/update/{title}/{artist}/{album}", status_code=200)
 async def update_song(
     db: db_dependency,
     user: user_dependency,
@@ -390,7 +390,7 @@ async def update_song(
     return song
 
 
-@router.delete("/{title}/{artist}/{album}", status_code=204)
+@router.delete("/delete/{title}/{artist}/{album}", status_code=204)
 async def delete_song(
     db: db_dependency,
     user: user_dependency,

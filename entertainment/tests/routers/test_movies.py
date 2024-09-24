@@ -373,7 +373,7 @@ async def test_update_movie_200(
     payload = {"score": 9.9, "orig_title": "Pool of death"}
 
     response = await async_client.patch(
-        f"/movies/{title}/2016-02-11",
+        f"/movies/update/{title}/2016-02-11",
         json=payload,
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -388,7 +388,9 @@ async def test_update_movie_401_if_not_authenticated(
 ):
     payload = {"score": 9.9, "original title": "Pool of death"}
 
-    response = await async_client.patch("/movies/Deadpool/2016-02-11", json=payload)
+    response = await async_client.patch(
+        "/movies/update/Deadpool/2016-02-11", json=payload
+    )
     assert response.status_code == 401
     assert "Not authenticated" in response.content.decode()
 
@@ -400,7 +402,7 @@ async def test_update_movie_404_movie_not_found(
     payload = {"score": 9.9, "original title": "Pool of death"}
 
     response = await async_client.patch(
-        "/movies/Deadpool/2016-02-11",
+        "/movies/update/Deadpool/2016-02-11",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -436,7 +438,7 @@ async def test_update_movie_200_update_by_the_admin(async_client: AsyncClient):
     with patch("entertainment.routers.movies.get_unique_row_data") as mock_function:
         mock_function.return_value = ["Action", "Adventure", "Comedy", "Romance", "War"]
         response = await async_client.patch(
-            f"/movies/{movie.title}/{movie.premiere}",
+            f"/movies/update/{movie.title}/{movie.premiere}",
             json=payload,
             headers={"Authorization": f"Bearer {admin_token}"},
         )
@@ -456,7 +458,7 @@ async def test_update_movie_403_update_by_the_user_who_is_not_the_movie_creator(
     payload = {"title": movie.title, "premiere": movie.premiere.strftime("%Y-%m-%d")}
 
     response = await async_client.patch(
-        f"/movies/{movie.title}/{movie.premiere}",
+        f"/movies/update/{movie.title}/{movie.premiere}",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -499,7 +501,7 @@ async def test_update_movie_422_not_unique_movie(
     # movie title and premiere to the same as already existing one
     # (created by create_movie func)
     response = await async_client.patch(
-        "/movies/Deadpool/2016-02-11",
+        "/movies/update/Deadpool/2016-02-11",
         json={"title": title, "premiere": "2012-12-12"},
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -527,7 +529,7 @@ async def test_update_movie_400_if_no_data_to_change(
     with patch("entertainment.routers.movies.get_unique_row_data") as mock_function:
         mock_function.return_value = ["Action", "Adventure", "Comedy", "Romance", "War"]
         response = await async_client.patch(
-            "/movies/{0}/{1}".format(added_movie.title, added_movie.premiere),
+            "/movies/update/{0}/{1}".format(added_movie.title, added_movie.premiere),
             json=payload,
             headers={"Authorization": f"Bearer {created_token}"},
         )
@@ -562,7 +564,7 @@ async def test_update_movie_422_incorrect_update_data(
     payload = invalid_payload
 
     response = await async_client.patch(
-        "/movies/Deadpool/2016-02-11",
+        "/movies/update/Deadpool/2016-02-11",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -592,7 +594,7 @@ async def test_delete_movie_204(
 
     # Calling the endpoint
     response = await async_client.delete(
-        "/movies/{0}/{1}".format(added_movie.title, added_movie.premiere),
+        "/movies/delete/{0}/{1}".format(added_movie.title, added_movie.premiere),
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 204
@@ -620,7 +622,7 @@ async def test_delete_movie_401_if_not_authenticated(
 
     # Calling the endpoint
     response = await async_client.delete(
-        "/movies/Deadpool/2016-02-11",
+        "/movies/delete/Deadpool/2016-02-11",
     )
     assert response.status_code == 401
     assert "Not authenticated" in response.content.decode()
@@ -656,7 +658,7 @@ async def test_delete_movie_204_by_the_admin_user(async_client: AsyncClient):
 
     # Calling the endpoint by the admin user
     response = await async_client.delete(
-        f"/movies/{movie.title}/{movie.premiere}",
+        f"/movies/delete/{movie.title}/{movie.premiere}",
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert response.status_code == 204
@@ -680,7 +682,7 @@ async def test_delete_movie_403_delete_by_the_user_who_is_not_the_movie_creator(
 
     # Calling the endpoint by 'testuser'
     response = await async_client.delete(
-        f"/movies/{movie.title}/{movie.premiere}",
+        f"/movies/delete/{movie.title}/{movie.premiere}",
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 403
@@ -701,7 +703,7 @@ async def test_delete_movie_404_movie_not_found(
     async_client: AsyncClient, created_token: str
 ):
     response = await async_client.delete(
-        "/movies/deadpool/2004-02-13",
+        "/movies/delete/deadpool/2004-02-13",
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 404

@@ -265,7 +265,7 @@ async def add_game(
     return game
 
 
-@router.patch("/{title}/{premiere}/{developer}", status_code=status.HTTP_200_OK)
+@router.patch("/update/{title}/{premiere}/{developer}", status_code=status.HTTP_200_OK)
 async def update_game(
     db: db_dependency,
     user: user_dependency,
@@ -346,7 +346,7 @@ async def update_game(
 
 
 @router.delete(
-    "/{title}/{premiere}/{developer}", status_code=status.HTTP_204_NO_CONTENT
+    "/delete/{title}/{premiere}/{developer}", status_code=status.HTTP_204_NO_CONTENT
 )
 async def delete_game(
     db: db_dependency,

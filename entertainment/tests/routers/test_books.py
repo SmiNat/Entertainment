@@ -442,7 +442,7 @@ async def test_update_book_200(
     with patch("entertainment.routers.books.get_unique_row_data") as mock_function:
         mock_function.return_value = ["Classics", "Fantasy", "Fiction", "Romance"]
         response = await async_client.patch(
-            f"/books/{title}/{author}",
+            f"/books/update/{title}/{author}",
             json=payload,
             headers={"Authorization": f"Bearer {token}"},
         )
@@ -456,7 +456,8 @@ async def test_update_book_401_if_not_authenticated(
 ):
     payload = book_payload()
     response = await async_client.patch(
-        "/books/{0}/{1}".format(added_book.title, added_book.author), json=payload
+        "/books/update/{0}/{1}".format(added_book.title, added_book.author),
+        json=payload,
     )
     assert response.status_code == 401
     assert "Not authenticated" in response.text
@@ -472,7 +473,7 @@ async def test_update_book_404_if_book_not_found(
 
     for element in invalid_data:
         response = await async_client.patch(
-            "/books/{0}/{1}".format(element["title"], element["author"]),
+            "/books/update/{0}/{1}".format(element["title"], element["author"]),
             json={"avg_rating": 1.1},
             headers={"Authorization": f"Bearer {created_token}"},
         )
@@ -495,7 +496,7 @@ async def test_update_book_200_update_by_the_record_creator(
     assert added_book.updated_by != user["username"]
 
     response = await async_client.patch(
-        "/books/{0}/{1}".format(added_book.title, added_book.author),
+        "/books/update/{0}/{1}".format(added_book.title, added_book.author),
         json={"avg_rating": 1.1},
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -516,7 +517,7 @@ async def test_update_book_200_update_by_the_admin(
     assert added_book.updated_by != "admin_user"
 
     response = await async_client.patch(
-        "/books/{0}/{1}".format(added_book.title, added_book.author),
+        "/books/update/{0}/{1}".format(added_book.title, added_book.author),
         json={"avg_rating": 1.1},
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -536,7 +537,7 @@ async def test_update_book_403_update_by_the_user_who_is_not_the_book_creator_no
     assert added_book.avg_rating != 1.1
 
     response = await async_client.patch(
-        "/books/{0}/{1}".format(added_book.title, added_book.author),
+        "/books/update/{0}/{1}".format(added_book.title, added_book.author),
         json={"avg_rating": 1.1},
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -576,7 +577,7 @@ async def test_update_book_422_not_unique_book(
     payload = {"title": new_title, "author": new_author}
 
     response = await async_client.patch(
-        "/books/{0}/{1}".format(added_book.title, added_book.author),
+        "/books/update/{0}/{1}".format(added_book.title, added_book.author),
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -600,7 +601,7 @@ async def test_update_book_400_if_no_data_to_change(
     comment: str,
 ):
     response = await async_client.patch(
-        "/books/{0}/{1}".format(added_book.title, added_book.author),
+        "/books/update/{0}/{1}".format(added_book.title, added_book.author),
         json=invalid_payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -635,7 +636,7 @@ async def test_update_book_422_incorrect_update_data(
     error_msg: str,
 ):
     response = await async_client.patch(
-        "/books/{0}/{1}".format(added_book.title, added_book.author),
+        "/books/update/{0}/{1}".format(added_book.title, added_book.author),
         json=invalid_payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -664,7 +665,7 @@ async def test_delete_book_204(
 
     # Calling the endpoint
     response = await async_client.delete(
-        "/books/{0}/{1}".format(added_book.title, added_book.author),
+        "/books/delete/{0}/{1}".format(added_book.title, added_book.author),
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 204
@@ -684,7 +685,7 @@ async def test_delete_book_401_not_authenticated(
     async_client: AsyncClient, added_book: Books
 ):
     response = await async_client.delete(
-        "/books/{0}/{1}".format(added_book.title, added_book.author),
+        "/books/delete/{0}/{1}".format(added_book.title, added_book.author),
     )
     assert response.status_code == 401
     assert "Not authenticated" in response.json()["detail"]
@@ -695,7 +696,7 @@ async def test_delete_book_404_book_not_found(
     async_client: AsyncClient, created_token: str
 ):
     response = await async_client.delete(
-        "/books/fake title/fake author",
+        "/books/delete/fake title/fake author",
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 404
@@ -727,7 +728,7 @@ async def test_delete_book_204_by_the_admin_user(
 
     # Calling the endpoint
     response = await async_client.delete(
-        "/books/{0}/{1}".format(added_book.title, added_book.author),
+        "/books/delete/{0}/{1}".format(added_book.title, added_book.author),
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 204
@@ -750,7 +751,7 @@ async def test_delete_book_403_forbidden_if_not_admin_or_book_creator(
     assert added_book.created_by != some_user.username
 
     response = await async_client.delete(
-        "/books/{0}/{1}".format(added_book.title, added_book.author),
+        "/books/delete/{0}/{1}".format(added_book.title, added_book.author),
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 403

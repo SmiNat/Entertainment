@@ -188,11 +188,15 @@ async def search_movies(
 
     if exclude_empty_data:
         query = query.filter(Movies.score >= score_ge)
+        if crew is not None:
+            query = query.filter(Movies.crew.icontains(crew))
     else:
         query = query.filter(or_(Movies.score >= score_ge, Movies.score.is_(None)))
+        if crew is not None:
+            query = query.filter(
+                or_(Movies.crew.icontains(crew), Movies.crew.is_(None))
+            )
 
-    if crew is not None:
-        query = query.filter(Movies.crew.icontains(crew))
     if genre_primary is not None:
         query = query.filter(Movies.genres.icontains(genre_primary))
     if genre_secondary is not None:
@@ -246,7 +250,7 @@ async def add_movie(
     return movie
 
 
-@router.patch("/{title}/{premiere}", status_code=200)
+@router.patch("/update/{title}/{premiere}", status_code=200)
 async def update_movie(
     db: db_dependency,
     user: user_dependency,
@@ -313,7 +317,7 @@ async def update_movie(
     return movie
 
 
-@router.delete("/{title}/{premiere}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/delete/{title}/{premiere}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_movie(
     title: str, premiere: str, db: db_dependency, user: user_dependency
 ):

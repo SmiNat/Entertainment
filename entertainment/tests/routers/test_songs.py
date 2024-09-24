@@ -329,7 +329,7 @@ async def test_update_song_200(
     assert added_song.updated_by is None
 
     response = await async_client.patch(
-        f"/songs/{added_song.title}/{added_song.artist}/{added_song.album_name}",
+        f"/songs/update/{added_song.title}/{added_song.artist}/{added_song.album_name}",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -346,7 +346,7 @@ async def test_update_song_401_if_not_authenticated(
     payload = {"artist": "New"}
 
     response = await async_client.patch(
-        f"/songs/{added_song.title}/{added_song.artist}/{added_song.album_name}",
+        f"/songs/update/{added_song.title}/{added_song.artist}/{added_song.album_name}",
         json=payload,
     )
     assert response.status_code == 401
@@ -360,7 +360,7 @@ async def test_update_song_404_if_song_not_found(
     payload = {"artist": "New"}
 
     response = await async_client.patch(
-        f"/songs/invalid/{added_song.artist}/{added_song.album_name}",
+        f"/songs/update/invalid/{added_song.artist}/{added_song.album_name}",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -378,7 +378,7 @@ async def test_update_song_200_update_by_the_admin(
     payload = {"artist": "New"}
 
     response = await async_client.patch(
-        f"/songs/{added_song.title}/{added_song.artist}/{added_song.album_name}",
+        f"/songs/update/{added_song.title}/{added_song.artist}/{added_song.album_name}",
         json=payload,
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -397,7 +397,7 @@ async def test_update_song_403_update_by_the_user_who_is_not_the_song_creator_no
     payload = {"artist": "New"}
 
     response = await async_client.patch(
-        f"/songs/{added_song.title}/{added_song.artist}/{added_song.album_name}",
+        f"/songs/update/{added_song.title}/{added_song.artist}/{added_song.album_name}",
         json=payload,
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -418,7 +418,7 @@ async def test_update_song_422_not_unique_song(
     payload = {"album_name": "Abc album"}
 
     response = await async_client.patch(
-        f"/songs/{added_song.title}/{added_song.artist}/{added_song.album_name}",
+        f"/songs/update/{added_song.title}/{added_song.artist}/{added_song.album_name}",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -433,7 +433,7 @@ async def test_update_song_400_if_no_data_to_change(
     payload = {}
 
     response = await async_client.patch(
-        f"/songs/{added_song.title}/{added_song.artist}/{added_song.album_name}",
+        f"/songs/update/{added_song.title}/{added_song.artist}/{added_song.album_name}",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -494,7 +494,7 @@ async def test_update_song_422_incorrect_update_data(
     payload = payload
 
     response = await async_client.patch(
-        f"/songs/{added_song.title}/{added_song.artist}/{added_song.album_name}",
+        f"/songs/update/{added_song.title}/{added_song.artist}/{added_song.album_name}",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -519,7 +519,7 @@ async def test_update_song_422_if_invalid_subgenre_with_old_genre(
         with patch("entertainment.routers.songs.get_genre_by_subgenre") as mocked_genre:
             mocked_genre.return_value = "rock"
             response = await async_client.patch(
-                f"/songs/{added_song.title}/{added_song.artist}/{added_song.album_name}",
+                f"/songs/update/{added_song.title}/{added_song.artist}/{added_song.album_name}",
                 json=payload,
                 headers={"Authorization": f"Bearer {created_token}"},
             )
@@ -540,7 +540,7 @@ async def test_update_song_422_if_invalid_genre(
     payload = {"playlist_genre": "invalid"}
 
     response = await async_client.patch(
-        f"/songs/{song.title}/{song.artist}/{song.album_name}",
+        f"/songs/update/{song.title}/{song.artist}/{song.album_name}",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -580,7 +580,7 @@ async def test_delete_song_204(
     assert song is not None
 
     response = await async_client.delete(
-        f"/songs/{title}/{artist}/{added_song.album_name}",
+        f"/songs/delete/{title}/{artist}/{added_song.album_name}",
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 204
@@ -603,7 +603,7 @@ async def test_delete_song_401_if_not_authenticated(
     added_song: Songs,
 ):
     response = await async_client.delete(
-        f"/songs/{added_song.title}/{added_song.artist}/{added_song.album_name}",
+        f"/songs/delete/{added_song.title}/{added_song.artist}/{added_song.album_name}",
     )
     assert response.status_code == 401
     assert "Not authenticated" in response.json()["detail"]
@@ -614,7 +614,7 @@ async def test_delete_song_404_if_song_not_found(
     async_client: AsyncClient, added_song: Songs, created_token: str
 ):
     response = await async_client.delete(
-        f"/songs/invalid/{added_song.artist}/{added_song.album_name}",
+        f"/songs/delete/invalid/{added_song.artist}/{added_song.album_name}",
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 404
@@ -633,7 +633,7 @@ async def test_delete_song_204_if_deleted_by_admin(
     assert added_song.created_by != user.username
 
     response = await async_client.delete(
-        f"/songs/{added_song.title}/{added_song.artist}/{added_song.album_name}",
+        f"/songs/delete/{added_song.title}/{added_song.artist}/{added_song.album_name}",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 204
@@ -659,7 +659,7 @@ async def test_delete_song_403_forbidden_if_not_admin_or_song_creator(
     assert added_song.created_by != user.username
 
     response = await async_client.delete(
-        f"/songs/{added_song.title}/{added_song.artist}/{added_song.album_name}",
+        f"/songs/delete/{added_song.title}/{added_song.artist}/{added_song.album_name}",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 403

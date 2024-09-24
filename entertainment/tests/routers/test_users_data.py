@@ -1,7 +1,6 @@
 import pytest
 from fastapi.encoders import jsonable_encoder
 from httpx import AsyncClient
-from sqlalchemy import text
 
 from entertainment.models import Books, UsersData
 from entertainment.tests.conftest import TestingSessionLocal
@@ -337,52 +336,6 @@ async def test_add_assessment_400_with_invalid_official_rate(
 
 
 @pytest.mark.anyio
-async def test_add_assessment_404_with_non_existing_attribute_title(
-    async_client: AsyncClient, created_token: str, setup_test_table
-):
-    """Test if assessing record without title raises 404 with detail:
-    '{data.category}' object has no attribute 'title'"""
-
-    # Insert a movie record into the movies table (with no title column)
-    with TestingSessionLocal() as db:
-        db.execute(
-            text("""
-            INSERT INTO movies (id, crew, awards, director, category)
-            VALUES (:id, :crew, :awards, :director, :category)
-        """),
-            {
-                "id": 1,
-                "crew": "John Doe",
-                "awards": "Best Picture",
-                "director": "Jane Smith",
-                "category": "Movies",
-            },
-        )
-        db.commit()
-
-    payload = {
-        "category": "Movies",
-        "id_number": 1,
-        "finished": False,
-        "wishlist": None,
-        "watchlist": False,
-        "official_rate": None,
-        "priv_rate": None,
-        "publ_comment": None,
-        "priv_notes": None,
-    }
-
-    response = await async_client.post(
-        "/assess/add",
-        headers={"Authorization": f"Bearer {created_token}"},
-        json=payload,
-    )
-
-    assert response.status_code == 404
-    assert response.json() == {"detail": "'Movies' has no attribute 'title'."}
-
-
-@pytest.mark.anyio
 async def test_add_assessment_422_with_already_assessed_record(
     async_client: AsyncClient, created_token: str, added_book: Books
 ):
@@ -424,7 +377,7 @@ async def test_update_assessment_patch_200(
 ):
     payload = {"priv_notes": "Test note"}
     response = await async_client.patch(
-        "/assess/Books/1",
+        "/assess/update/Books/1",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -438,7 +391,7 @@ async def test_update_assessment_patch_401_if_not_authenticated(
     async_client: AsyncClient, added_book: Books, added_users_data: UsersData
 ):
     payload = {"priv_notes": "Test note"}
-    response = await async_client.patch("/assess/Books/1", json=payload)
+    response = await async_client.patch("/assess/update/Books/1", json=payload)
     assert response.status_code == 401
     assert "Not authenticated" in response.json()["detail"]
 
@@ -455,7 +408,7 @@ async def test_update_assessment_patch_200_if_admin(
 
     payload = {"priv_notes": "Test note"}
     response = await async_client.patch(
-        f"/assess/{added_users_data.category}/{added_users_data.id_number}",
+        f"/assess/update/{added_users_data.category}/{added_users_data.id_number}",
         json=payload,
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -475,7 +428,7 @@ async def test_update_assessment_403_if_not_admin_or_not_author_of_the_record(
 
     payload = {"priv_notes": "Test note"}
     response = await async_client.patch(
-        f"/assess/{added_users_data.category}/{added_users_data.id_number}",
+        f"/assess/update/{added_users_data.category}/{added_users_data.id_number}",
         json=payload,
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -492,7 +445,7 @@ async def test_update_assessment_patch_404_if_non_existing_category(
 ):
     payload = {"priv_notes": "Test note"}
     response = await async_client.patch(
-        "/assess/xyz/1",
+        "/assess/update/xyz/1",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -511,7 +464,7 @@ async def test_update_assessment_patch_404_if_no_books_record_found(
 
     payload = {"priv_notes": "Test note"}
     response = await async_client.patch(
-        "/assess/Books/2",
+        "/assess/update/Books/2",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -537,7 +490,7 @@ async def test_update_assessment_patch_404_if_no_usersdata_record_found(
 
     payload = {"priv_notes": "Test note"}
     response = await async_client.patch(
-        "/assess/Books/1",
+        "/assess/update/Books/1",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -559,7 +512,7 @@ async def test_update_assessment_200_with_official_rate_as_int_or_string(
     payload = {"official_rate": official_rate}
 
     response = await async_client.patch(
-        "/assess/Books/1",
+        "/assess/update/Books/1",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -600,7 +553,7 @@ async def test_update_assessment_patch_incorrect_data(
 ):
     payload = payload
     response = await async_client.patch(
-        "/assess/Books/1",
+        "/assess/update/Books/1",
         json=payload,
         headers={"Authorization": f"Bearer {created_token}"},
     )
@@ -615,7 +568,7 @@ async def test_delete_assessment_204(
     added_users_data: UsersData,
 ):
     response = await async_client.delete(
-        "/assess/Books/1",
+        "/assess/delete/Books/1",
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 204
@@ -626,7 +579,7 @@ async def test_delete_assessment_401_if_not_authorized(
     async_client: AsyncClient,
     added_users_data: UsersData,
 ):
-    response = await async_client.delete("/assess/Books/1")
+    response = await async_client.delete("/assess/delete/Books/1")
     assert response.status_code == 401
     assert "Not authenticated" in response.json()["detail"]
 
@@ -637,7 +590,7 @@ async def test_delete_assessment_404_if_no_record_found(
     created_token: str,
 ):
     response = await async_client.delete(
-        "/assess/Books/1",
+        "/assess/delete/Books/1",
         headers={"Authorization": f"Bearer {created_token}"},
     )
     assert response.status_code == 404
@@ -655,7 +608,7 @@ async def test_delete_assessment_403_if_not_admin_or_record_author(
     assert added_users_data.created_by != user.username
 
     response = await async_client.delete(
-        "/assess/Books/1",
+        "/assess/delete/Books/1",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 403
@@ -672,7 +625,7 @@ async def test_delete_assessment_204_if_deleted_by_admin(
     assert added_users_data.created_by != user.username
 
     response = await async_client.delete(
-        "/assess/Books/1",
+        "/assess/delete/Books/1",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 204

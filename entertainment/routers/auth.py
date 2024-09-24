@@ -83,7 +83,9 @@ def authenticate_user(username: str, password: str, db: Session):
     return user
 
 
-async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
+async def get_current_user(
+    db: db_dependency, token: Annotated[str, Depends(oauth2_bearer)]
+):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
         logger.debug("Payload for get_current_user: %s" % payload)
@@ -96,6 +98,13 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
         )
 
         if username is None or user_id is None or user_role is None:
+            raise CredentialsException()
+
+        # Validate, if user is still in DB and has an active status
+        # (user can delete an account after which all authorized access should be forbidden)
+        user = db.query(Users).filter_by(id=user_id, username=username).first()
+        if not user or user.is_active is False:
+            logger.debug("No user '%s' in DB or user has inactive status." % (username))
             raise CredentialsException()
 
         return {"username": username, "id": user_id, "role": user_role}
