@@ -40,19 +40,6 @@ Base.metadata.create_all(bind=engine)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-# # Overriding database connection for all of the endpoins
-# def override_get_db():
-#     """Sets a clean db session for each test."""
-#     db = TestingSessionLocal()
-#     try:
-#         yield db
-#     finally:
-#         db.close()
-
-
-# app.dependency_overrides[get_db] = override_get_db
-
-
 # Overriding database connection for all of the endpoins
 @pytest.fixture(scope="function")
 def db_session():
@@ -129,14 +116,6 @@ def anyio_backend():
     return "asyncio"
 
 
-# # Creating test clients
-# @pytest.fixture
-# def client() -> Generator:
-#     """Yield TestClient() on tested app."""
-#     # app.dependency_overrides[get_db] = override_get_db
-#     yield TestClient(app)
-
-
 # Creating test clients
 @pytest.fixture
 def client(db_session) -> Generator:
@@ -155,8 +134,6 @@ async def async_client(client) -> AsyncGenerator:
 
 
 # Some app fixtures to use in tests
-
-
 @pytest.fixture
 def created_admin_user() -> Users:
     db = TestingSessionLocal()
